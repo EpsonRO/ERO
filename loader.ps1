@@ -12,7 +12,7 @@ if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out
 
 # Define tools: File, Type (exe/zip), and specific Exe to run inside zip if needed
 $tools = @(
-    @{Name="USBFix"; Url="https://github.com/<username>/<repo>/releases/download/v1.0/USBFix.zip"; File="USBFix.zip"; Type="zip"; Exe="USBFix1.exe"},
+    @{Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"},
     @{Name="Tool2";  Url="https://github.com/<username>/<repo>/releases/download/v1.0/Tool2.zip";  File="Tool2.zip";  Type="zip"; Exe="Tool2.exe"}
 )
 
