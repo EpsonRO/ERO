@@ -13,9 +13,10 @@ $tools = @(
 
 # ===== TEMP DIRECTORY =====
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
-if (-not (Test-Path $OutDir)) {
-    New-Item -ItemType Directory -Path $OutDir | Out-Null
+if (Test-Path $OutDir) {
+    Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue
 }
+New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool, $statusLabel) {
@@ -33,6 +34,7 @@ function Download-Run($tool, $statusLabel) {
     $statusLabel.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
+
     if (Test-Path $ExtractDir) {
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -120,8 +122,8 @@ $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
 
-# ===== AUTOFOCUS (REAL WORKING FIX) =====
-$window.Dispatcher.InvokeAsync({
+# ===== AUTOFOCUS (100% WORKING) =====
+$window.Loaded.Add({
     $modelBox.Focus()
     [System.Windows.Input.Keyboard]::Focus($modelBox)
 })
@@ -151,15 +153,15 @@ function Start-Tool {
     }
 }
 
-# ===== BUTTON CLICK =====
+# BUTTON
 $startBtn.Add_Click({ Start-Tool })
 
-# ===== ENTER KEY SUPPORT =====
+# ENTER KEY
 $modelBox.Add_KeyDown({
     if ($_.Key -eq "Return") {
         Start-Tool
     }
 })
 
-# ===== RUN APP =====
+# RUN
 $window.ShowDialog() | Out-Null
