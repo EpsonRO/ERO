@@ -120,7 +120,7 @@ $form.Controls.Add($statusStrip)
 # ===== CENTER TITLE (FIXED POSITION) =====
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 45   # 🔥 perfect vertical position
+    $title.Top = 35   # 🔥 perfect vertical position
     $textbox.Focus()
 })
 
