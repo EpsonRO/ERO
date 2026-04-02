@@ -24,7 +24,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction Silent
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# DOWNLOAD FUNCTION
+# DOWNLOAD FUNCTION (SAFE)
 # =========================
 function Download-Run($tool) {
     $statusLabel.Text = "Downloading..."
@@ -32,7 +32,6 @@ function Download-Run($tool) {
     $form.Refresh()
 
     $OutFile = Join-Path $OutDir $tool.File
-
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 
     try {
@@ -47,17 +46,17 @@ function Download-Run($tool) {
     $form.Refresh()
 
     $ExtractDir = Join-Path $OutDir $tool.Model
-    if (-not (Test-Path $ExtractDir)) { New-Item -ItemType Directory -Path $ExtractDir | Out-Null }
+    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue }
+    New-Item -ItemType Directory -Path $ExtractDir | Out-Null
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $zip = [System.IO.Compression.ZipFile]::OpenRead($OutFile)
-    foreach ($entry in $zip.Entries) {
-        $target = Join-Path $ExtractDir $entry.FullName
-        $dir = Split-Path $target -Parent
-        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-        $entry.ExtractToFile($target, $true)  # overwrite if exists
+    try {
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+    } catch [System.IO.IOException] {
+        Remove-Item $ExtractDir -Recurse -Force
+        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
     }
-    $zip.Dispose()
 
     $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
     if ($exe) {
@@ -78,14 +77,14 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(580,520)
 $form.StartPosition = "CenterScreen"
-$form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
+$form.BackColor = [System.Drawing.Color]::White
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = [System.Drawing.Color]::White
+$title.ForeColor = [System.Drawing.Color]::Black
 $title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
@@ -105,21 +104,21 @@ $searchBox.ForeColor = [System.Drawing.Color]::Gray
 $searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
-$searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
+$searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::Black } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
 # LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
 $modelList.Size = New-Object System.Drawing.Size(490,200)
-$modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$modelList.ForeColor = [System.Drawing.Color]::White
+$modelList.BackColor = [System.Drawing.Color]::White
+$modelList.ForeColor = [System.Drawing.Color]::Black
 $form.Controls.Add($modelList)
 
 # DETAILS LABEL
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
-$detailLabel.ForeColor = [System.Drawing.Color]::White
+$detailLabel.ForeColor = [System.Drawing.Color]::Black
 $detailLabel.Location = New-Object System.Drawing.Point(30,330)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
@@ -135,10 +134,9 @@ $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
 
-# STATUS BAR (light/default)
+# STATUS BAR (light)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
-$statusStrip.BackColor = [System.Drawing.SystemColors]::Control
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -161,7 +159,6 @@ $form.Add_Shown({
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
 
-    # Activate form
     $form.Activate()
     $form.BringToFront()
 })
