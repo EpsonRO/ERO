@@ -1,19 +1,14 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# ===== TOOL DATABASE =====
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
 
-# ===== TEMP DIRECTORY =====
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
-if (Test-Path $OutDir) {
-    Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue
-}
+if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
-# ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool) {
 
     $statusLabel.Text = "Downloading..."
@@ -52,7 +47,6 @@ function Download-Run($tool) {
     }
 }
 
-# ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(420,300)
@@ -61,7 +55,6 @@ $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
-# ===== TITLE =====
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
 $title.ForeColor = [System.Drawing.Color]::White
@@ -69,14 +62,12 @@ $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontS
 $title.AutoSize = $true
 $form.Controls.Add($title)
 
-# ===== LABEL =====
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Printer Model"
 $label.ForeColor = [System.Drawing.Color]::Silver
 $label.Location = New-Object System.Drawing.Point(30,90)
 $form.Controls.Add($label)
 
-# ===== TEXTBOX =====
 $textbox = New-Object System.Windows.Forms.TextBox
 $textbox.Size = New-Object System.Drawing.Size(340,28)
 $textbox.Location = New-Object System.Drawing.Point(30,115)
@@ -84,7 +75,6 @@ $textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $textbox.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($textbox)
 
-# ===== BUTTON =====
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
 $button.Size = New-Object System.Drawing.Size(340,38)
@@ -95,7 +85,6 @@ $button.FlatStyle = "Flat"
 $button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
-# ===== STATUS BAR =====
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
 $statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
@@ -117,14 +106,12 @@ $statusStrip.Items.Add($copyright) | Out-Null
 
 $form.Controls.Add($statusStrip)
 
-# ===== CENTER TITLE (FIXED POSITION) =====
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 30   # 🔥 perfect vertical position
+    $title.Top = 55   # 🔥 FINAL PERFECT POSITION
     $textbox.Focus()
 })
 
-# ===== EVENTS =====
 $textbox.Add_TextChanged({
     $pos = $textbox.SelectionStart
     $textbox.Text = $textbox.Text.ToUpper()
