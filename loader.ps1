@@ -5,36 +5,54 @@ if ([Threading.Thread]::CurrentThread.ApartmentState -ne "STA") {
 }
 
 Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName System.Net
 
 # ===== TOOL DATABASE =====
 $tools = @(
     @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"}
 )
 
-# ✅ USE TEMP DIRECTORY
+# TEMP DIRECTORY
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
-
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
 
-# ===== DOWNLOAD FUNCTION =====
-function Download-Run($tool, $statusLabel) {
+# ===== DOWNLOAD WITH PROGRESS =====
+function Download-File($url, $outFile, $progressBar, $statusLabel) {
 
-    $statusLabel.Text = "Downloading..."
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+
+    $done = $false
+
+    $wc.DownloadProgressChanged += {
+        $progressBar.Value = $_.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
+    }
+
+    $wc.DownloadFileCompleted += {
+        $done = $true
+    }
+
+    $wc.DownloadFileAsync($url, $outFile)
+
+    while (-not $done) {
+        Start-Sleep -Milliseconds 200
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+}
+
+# ===== MAIN FUNCTION =====
+function Download-Run($tool, $progressBar, $statusLabel) {
+
     $OutFile = Join-Path $OutDir $tool.File
 
-    try {
-        Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile
-    } catch {
-        $statusLabel.Text = "Download failed."
-        return
-    }
+    Download-File $tool.Url $OutFile $progressBar $statusLabel
 
     $statusLabel.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
-
     if (Test-Path $ExtractDir) {
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -52,12 +70,12 @@ function Download-Run($tool, $statusLabel) {
         $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName -Wait
 
-        $statusLabel.Text = "Cleaning up..."
+        $statusLabel.Text = "Cleaning..."
 
-        # ✅ DELETE FILES AFTER RUN
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
+        $progressBar.Value = 0
         $statusLabel.Text = "Done!"
     } else {
         $statusLabel.Text = "EXE not found."
@@ -68,7 +86,7 @@ function Download-Run($tool, $statusLabel) {
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         Title="Epson Resetter"
-        Height="320" Width="420"
+        Height="360" Width="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#1b1b1b">
@@ -103,10 +121,14 @@ function Download-Run($tool, $statusLabel) {
                         FontWeight="Bold"
                         BorderThickness="0"/>
 
+                <ProgressBar Name="ProgressBar"
+                             Height="20"
+                             Margin="0,15,0,5"
+                             Minimum="0" Maximum="100"/>
+
                 <TextBlock Name="StatusLabel"
                            Text="Ready"
                            Foreground="#aaaaaa"
-                           Margin="0,15,0,0"
                            HorizontalAlignment="Center"/>
 
             </StackPanel>
@@ -122,8 +144,9 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
+$progressBar = $window.FindName("ProgressBar")
 
-# ✅ REAL AUTOFOCUS FIX
+# AUTOFOCUS (REAL FIX)
 $window.Dispatcher.InvokeAsync({
     $modelBox.Focus()
     [System.Windows.Input.Keyboard]::Focus($modelBox)
@@ -148,8 +171,7 @@ function Start-Tool {
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        $statusLabel.Text = "Model found..."
-        Download-Run $tool $statusLabel
+        Download-Run $tool $progressBar $statusLabel
     } else {
         $statusLabel.Text = "Model not added."
     }
