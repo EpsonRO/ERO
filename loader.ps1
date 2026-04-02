@@ -114,16 +114,27 @@ function Download-Run($tool, $statusLabel) {
 </Window>
 "@
 
-# ===== LOAD UI =====
-$reader = New-Object System.Xml.XmlNodeReader $xaml
-$window = [Windows.Markup.XamlReader]::Load($reader)
+# ===== LOAD UI SAFELY =====
+try {
+    $reader = New-Object System.Xml.XmlNodeReader $xaml
+    $window = [Windows.Markup.XamlReader]::Load($reader)
+} catch {
+    Write-Host "❌ UI failed to load"
+    exit
+}
+
+# CHECK IF NULL
+if (-not $window) {
+    Write-Host "❌ Window is null"
+    exit
+}
 
 $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
 
-# ===== AUTOFOCUS (100% WORKING) =====
-$window.Loaded.Add({
+# ===== AUTOFOCUS (SAFE + WORKING) =====
+$window.Dispatcher.BeginInvoke([action]{
     $modelBox.Focus()
     [System.Windows.Input.Keyboard]::Focus($modelBox)
 })
