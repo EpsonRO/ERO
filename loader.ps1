@@ -69,23 +69,17 @@ $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontS
 $title.AutoSize = $true
 $form.Controls.Add($title)
 
-# 🔥 CENTER TITLE DYNAMICALLY
-$form.Add_Shown({
-    $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $textbox.Focus()
-})
-
 # ===== LABEL =====
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Printer Model"
 $label.ForeColor = [System.Drawing.Color]::Silver
-$label.Location = New-Object System.Drawing.Point(30,80)
+$label.Location = New-Object System.Drawing.Point(30,90)
 $form.Controls.Add($label)
 
 # ===== TEXTBOX =====
 $textbox = New-Object System.Windows.Forms.TextBox
 $textbox.Size = New-Object System.Drawing.Size(340,28)
-$textbox.Location = New-Object System.Drawing.Point(30,105)
+$textbox.Location = New-Object System.Drawing.Point(30,115)
 $textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $textbox.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($textbox)
@@ -94,7 +88,7 @@ $form.Controls.Add($textbox)
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
 $button.Size = New-Object System.Drawing.Size(340,38)
-$button.Location = New-Object System.Drawing.Point(30,145)
+$button.Location = New-Object System.Drawing.Point(30,155)
 $button.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
 $button.ForeColor = [System.Drawing.Color]::White
 $button.FlatStyle = "Flat"
@@ -121,8 +115,14 @@ $statusStrip.Items.Add($statusLabel) | Out-Null
 $statusStrip.Items.Add($spacer) | Out-Null
 $statusStrip.Items.Add($copyright) | Out-Null
 
-# 🔥 IMPORTANT: ADD LAST
 $form.Controls.Add($statusStrip)
+
+# ===== CENTER TITLE (FIXED POSITION) =====
+$form.Add_Shown({
+    $title.Left = ($form.ClientSize.Width - $title.Width) / 2
+    $title.Top = 35   # 🔥 perfect vertical position
+    $textbox.Focus()
+})
 
 # ===== EVENTS =====
 $textbox.Add_TextChanged({
