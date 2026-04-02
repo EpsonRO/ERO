@@ -28,6 +28,7 @@ New-Item -ItemType Directory -Path $OutDir | Out-Null
 # =========================
 function Download-Run($tool) {
     $form.UseWaitCursor = $true
+    $form.Refresh()
     $statusLabel.Text = "Downloading..."
     $buttonDownload.Enabled = $false
     $form.Refresh()
@@ -54,7 +55,7 @@ function Download-Run($tool) {
     $statusLabel.Text = "Extracting..."
     $form.Refresh()
 
-    # Manual extraction to allow overwriting
+    # Manual extraction to allow overwrite
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [System.IO.Compression.ZipFile]::OpenRead($OutFile)
     foreach ($entry in $zip.Entries) {
@@ -73,6 +74,7 @@ function Download-Run($tool) {
     $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
     if ($exe) {
         $statusLabel.Text = "Launching..."
+        $form.Refresh()
         Start-Process $exe.FullName -Wait
         $statusLabel.Text = "Done!"
     } else {
@@ -119,7 +121,6 @@ $searchBox.ForeColor = [System.Drawing.Color]::Gray
 $searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $searchBox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$searchBox.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
@@ -181,7 +182,6 @@ $form.Add_Shown({
     $form.BringToFront()
 })
 
-# Series selection
 $seriesCombo.Add_SelectedIndexChanged({
     $selectedSeries = $seriesCombo.SelectedItem
     $modelList.Items.Clear()
@@ -190,7 +190,6 @@ $seriesCombo.Add_SelectedIndexChanged({
     $buttonDownload.Enabled = $false
 })
 
-# Live search
 $searchBox.Add_TextChanged({
     if ($searchBox.Text -eq "Search model...") { return }
     $query = $searchBox.Text.ToUpper()
@@ -199,7 +198,6 @@ $searchBox.Add_TextChanged({
     if ($selected) { $seriesModels[$selected] | Where-Object { $_.ToUpper() -like "*$query*" } | ForEach-Object { $modelList.Items.Add($_) } }
 })
 
-# Listbox selection -> show detail
 $modelList.Add_SelectedIndexChanged({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
@@ -211,7 +209,6 @@ $modelList.Add_SelectedIndexChanged({
     }
 })
 
-# Download & Run
 $buttonDownload.Add_Click({
     $selModel = $modelList.SelectedItem
     if ($selModel) { $tool = $tools | Where-Object { $_.Model -eq $selModel }; if ($tool) { Download-Run $tool } }
