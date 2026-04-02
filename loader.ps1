@@ -55,7 +55,7 @@ function Download-Run($tool) {
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(420,280)
+$form.Size = New-Object System.Drawing.Size(420,300)  # 🔥 increased height
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -83,7 +83,6 @@ $textbox.Size = New-Object System.Drawing.Size(340,28)
 $textbox.Location = New-Object System.Drawing.Point(30,105)
 $textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $textbox.ForeColor = [System.Drawing.Color]::White
-$textbox.BorderStyle = "FixedSingle"
 $form.Controls.Add($textbox)
 
 # ===== BUTTON =====
@@ -97,25 +96,26 @@ $button.FlatStyle = "Flat"
 $button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
-# ===== STATUS STRIP =====
+# ===== STATUS BAR =====
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
+$statusStrip.Dock = "Bottom"   # 🔥 force bottom
+$statusStrip.SizingGrip = $false
 $statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 
-# LEFT STATUS TEXT
+# LEFT TEXT
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
 $statusLabel.ForeColor = [System.Drawing.Color]::White
 
-# SPRING (push right)
+# SPACER
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
 $spacer.Spring = $true
 
-# RIGHT COPYRIGHT
+# COPYRIGHT RIGHT
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
 $copyright.ForeColor = [System.Drawing.Color]::Gray
 
-# ADD TO STATUS BAR
 $statusStrip.Items.Add($statusLabel) | Out-Null
 $statusStrip.Items.Add($spacer) | Out-Null
 $statusStrip.Items.Add($copyright) | Out-Null
@@ -127,14 +127,14 @@ $form.Add_Shown({
     $textbox.Focus()
 })
 
-# AUTO UPPERCASE
+# ===== UPPERCASE =====
 $textbox.Add_TextChanged({
     $pos = $textbox.SelectionStart
     $textbox.Text = $textbox.Text.ToUpper()
     $textbox.SelectionStart = $pos
 })
 
-# ===== START FUNCTION =====
+# ===== START =====
 function Start-Tool {
     $model = $textbox.Text.Trim()
 
@@ -152,15 +152,12 @@ function Start-Tool {
     }
 }
 
-# BUTTON
 $button.Add_Click({ Start-Tool })
 
-# ENTER KEY
 $textbox.Add_KeyDown({
     if ($_.KeyCode -eq "Enter") {
         Start-Tool
     }
 })
 
-# RUN
 $form.ShowDialog()
