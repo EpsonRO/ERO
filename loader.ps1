@@ -1,16 +1,6 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# ===== WINDOWS API (FORCE FOCUS) =====
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class WinAPI {
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-}
-"@
-
 # ===== TOOL DATABASE =====
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
@@ -24,19 +14,19 @@ if (Test-Path $OutDir) {
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # ===== DOWNLOAD FUNCTION =====
-function Download-Run($tool, $statusLabel) {
+function Download-Run($tool) {
 
-    $statusLabel.Text = "Downloading..."
+    $status.Text = "Downloading..."
     $OutFile = Join-Path $OutDir $tool.File
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
     } catch {
-        $statusLabel.Text = "Download failed."
+        $status.Text = "Download failed."
         return
     }
 
-    $statusLabel.Text = "Extracting..."
+    $status.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
@@ -49,40 +39,36 @@ function Download-Run($tool, $statusLabel) {
            Select-Object -First 1
 
     if ($exe) {
-        $statusLabel.Text = "Launching..."
+        $status.Text = "Launching..."
         Start-Process $exe.FullName -Wait
 
-        $statusLabel.Text = "Cleaning..."
+        $status.Text = "Cleaning..."
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
-        $statusLabel.Text = "Done!"
+        $status.Text = "Done!"
     } else {
-        $statusLabel.Text = "EXE not found."
+        $status.Text = "EXE not found."
     }
 }
 
-# ===== CREATE FORM =====
+# ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Epson Resetter"
 $form.Size = New-Object System.Drawing.Size(400,250)
 $form.StartPosition = "CenterScreen"
-$form.BackColor = "#1b1b1b"
-$form.TopMost = $true   # 🔥 force on top
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
-$title.Text = "EPSON RESETTER"
-$title.ForeColor = "White"
-$title.Font = New-Object System.Drawing.Font("Arial",14,[System.Drawing.FontStyle]::Bold)
+$title.Text = "EPSON RESETTER ONLINE"
+$title.Font = New-Object System.Drawing.Font("Arial",12,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(100,20)
+$title.Location = New-Object System.Drawing.Point(90,20)
 $form.Controls.Add($title)
 
 # LABEL
 $label = New-Object System.Windows.Forms.Label
-$label.Text = "Printer Model"
-$label.ForeColor = "LightGray"
+$label.Text = "Enter Printer Model:"
 $label.Location = New-Object System.Drawing.Point(30,70)
 $form.Controls.Add($label)
 
@@ -94,29 +80,21 @@ $form.Controls.Add($textbox)
 
 # BUTTON
 $button = New-Object System.Windows.Forms.Button
-$button.Text = "START"
-$button.Size = New-Object System.Drawing.Size(320,35)
+$button.Text = "Start"
+$button.Size = New-Object System.Drawing.Size(320,30)
 $button.Location = New-Object System.Drawing.Point(30,130)
 $form.Controls.Add($button)
 
 # STATUS
 $status = New-Object System.Windows.Forms.Label
-$status.Text = "Ready"
-$status.ForeColor = "Gray"
+$status.Text = ""
 $status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(150,180)
+$status.Location = New-Object System.Drawing.Point(30,170)
 $form.Controls.Add($status)
 
-# ===== FORCE FOCUS =====
+# ===== AUTOFOCUS (SIMPLE & RELIABLE) =====
 $form.Add_Shown({
-    Start-Sleep -Milliseconds 200
-
-    # Bring window to front
-    [WinAPI]::ShowWindow($form.Handle, 5)
-    [WinAPI]::SetForegroundWindow($form.Handle)
-
-    # Force textbox focus
-    $textbox.Focus()
+    $textbox.Select()
 })
 
 # AUTO UPPERCASE
@@ -138,13 +116,13 @@ function Start-Tool {
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        Download-Run $tool $status
+        Download-Run $tool
     } else {
-        $status.Text = "Model not added."
+        $status.Text = "Printer model not added."
     }
 }
 
-# BUTTON
+# BUTTON CLICK
 $button.Add_Click({ Start-Tool })
 
 # ENTER KEY
@@ -155,4 +133,4 @@ $textbox.Add_KeyDown({
 })
 
 # RUN
-[void]$form.ShowDialog()
+$form.ShowDialog()
