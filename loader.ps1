@@ -27,6 +27,7 @@ New-Item -ItemType Directory -Path $OutDir | Out-Null
 # DOWNLOAD FUNCTION (SAFE)
 # =========================
 function Download-Run($tool) {
+    $form.UseWaitCursor = $true
     $statusLabel.Text = "Downloading..."
     $buttonDownload.Enabled = $false
     $form.Refresh()
@@ -39,6 +40,7 @@ function Download-Run($tool) {
     } catch {
         $statusLabel.Text = "Download failed."
         $buttonDownload.Enabled = $true
+        $form.UseWaitCursor = $false
         return
     }
 
@@ -78,6 +80,7 @@ function Download-Run($tool) {
     }
 
     $buttonDownload.Enabled = $true
+    $form.UseWaitCursor = $false
 }
 
 # =========================
@@ -87,14 +90,14 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(580,520)
 $form.StartPosition = "CenterScreen"
-$form.BackColor = [System.Drawing.Color]::White
+$form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = [System.Drawing.Color]::Black
+$title.ForeColor = [System.Drawing.Color]::White
 $title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
@@ -105,6 +108,8 @@ $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
 $seriesCombo.Location = New-Object System.Drawing.Point(30,80)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
+$seriesCombo.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
+$seriesCombo.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($seriesCombo)
 
 # SEARCH BOX
@@ -113,22 +118,24 @@ $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
 $searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
+$searchBox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
+$searchBox.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($searchBox)
-$searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::Black } })
+$searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
 # LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
 $modelList.Size = New-Object System.Drawing.Size(490,200)
-$modelList.BackColor = [System.Drawing.Color]::White
-$modelList.ForeColor = [System.Drawing.Color]::Black
+$modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
+$modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
 
 # DETAILS LABEL
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
-$detailLabel.ForeColor = [System.Drawing.Color]::Black
+$detailLabel.ForeColor = [System.Drawing.Color]::White
 $detailLabel.Location = New-Object System.Drawing.Point(30,330)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
@@ -147,6 +154,7 @@ $form.Controls.Add($buttonDownload)
 # STATUS BAR (light)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
+$statusStrip.BackColor = [System.Drawing.Color]::White
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
