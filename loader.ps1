@@ -1,14 +1,10 @@
-# FORCE STA MODE
-if ([Threading.Thread]::CurrentThread.ApartmentState -ne "STA") {
-    powershell -STA -File $PSCommandPath
-    exit
-}
-
-Add-Type -AssemblyName PresentationFramework
+# ===== LOAD GUI LIBRARIES =====
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
 # ===== TOOL DATABASE =====
 $tools = @(
-    @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"}
+    @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
 
 # ===== TEMP DIRECTORY =====
@@ -34,12 +30,7 @@ function Download-Run($tool, $statusLabel) {
     $statusLabel.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
-
-    if (Test-Path $ExtractDir) {
-        Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+    New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
@@ -53,7 +44,6 @@ function Download-Run($tool, $statusLabel) {
         Start-Process $exe.FullName -Wait
 
         $statusLabel.Text = "Cleaning..."
-
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
@@ -63,116 +53,89 @@ function Download-Run($tool, $statusLabel) {
     }
 }
 
-# ===== UI =====
-[xml]$xaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        Title="Epson Resetter"
-        Height="320" Width="420"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        Background="#1b1b1b">
+# ===== CREATE FORM =====
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Epson Resetter"
+$form.Size = New-Object System.Drawing.Size(400,250)
+$form.StartPosition = "CenterScreen"
+$form.BackColor = "#1b1b1b"
 
-    <Grid>
-        <Border Background="#252526" CornerRadius="10" Padding="20" Margin="10">
-            <StackPanel>
+# TITLE
+$title = New-Object System.Windows.Forms.Label
+$title.Text = "EPSON RESETTER"
+$title.ForeColor = "White"
+$title.Font = New-Object System.Drawing.Font("Arial",14,[System.Drawing.FontStyle]::Bold)
+$title.AutoSize = $true
+$title.Location = New-Object System.Drawing.Point(100,20)
+$form.Controls.Add($title)
 
-                <TextBlock Text="EPSON RESETTER"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,20"/>
+# LABEL
+$label = New-Object System.Windows.Forms.Label
+$label.Text = "Printer Model"
+$label.ForeColor = "LightGray"
+$label.Location = New-Object System.Drawing.Point(30,70)
+$form.Controls.Add($label)
 
-                <TextBlock Text="Printer Model"
-                           Foreground="#cccccc"/>
+# TEXTBOX
+$textbox = New-Object System.Windows.Forms.TextBox
+$textbox.Size = New-Object System.Drawing.Size(320,25)
+$textbox.Location = New-Object System.Drawing.Point(30,95)
+$form.Controls.Add($textbox)
 
-                <TextBox Name="ModelBox"
-                         Height="32"
-                         Margin="0,5,0,15"
-                         Background="#2d2d30"
-                         Foreground="White"
-                         BorderThickness="0"
-                         Padding="8"/>
+# BUTTON
+$button = New-Object System.Windows.Forms.Button
+$button.Text = "START"
+$button.Size = New-Object System.Drawing.Size(320,35)
+$button.Location = New-Object System.Drawing.Point(30,130)
+$form.Controls.Add($button)
 
-                <Button Name="StartBtn"
-                        Content="START"
-                        Height="40"
-                        Background="#0078D7"
-                        Foreground="White"
-                        FontWeight="Bold"
-                        BorderThickness="0"/>
+# STATUS
+$status = New-Object System.Windows.Forms.Label
+$status.Text = "Ready"
+$status.ForeColor = "Gray"
+$status.AutoSize = $true
+$status.Location = New-Object System.Drawing.Point(150,180)
+$form.Controls.Add($status)
 
-                <TextBlock Name="StatusLabel"
-                           Text="Ready"
-                           Foreground="#aaaaaa"
-                           Margin="15,15,0,0"
-                           HorizontalAlignment="Center"/>
-
-            </StackPanel>
-        </Border>
-    </Grid>
-</Window>
-"@
-
-# ===== LOAD UI SAFELY =====
-try {
-    $reader = New-Object System.Xml.XmlNodeReader $xaml
-    $window = [Windows.Markup.XamlReader]::Load($reader)
-} catch {
-    Write-Host "❌ UI failed to load"
-    exit
-}
-
-# CHECK IF NULL
-if (-not $window) {
-    Write-Host "❌ Window is null"
-    exit
-}
-
-$modelBox = $window.FindName("ModelBox")
-$startBtn = $window.FindName("StartBtn")
-$statusLabel = $window.FindName("StatusLabel")
-
-# ===== AUTOFOCUS (SAFE + WORKING) =====
-$window.Dispatcher.BeginInvoke([action]{
-    $modelBox.Focus()
-    [System.Windows.Input.Keyboard]::Focus($modelBox)
+# ===== AUTOFOCUS (WORKS 100%) =====
+$form.Add_Shown({
+    $textbox.Focus()
 })
 
-# ===== AUTO UPPERCASE =====
-$modelBox.Add_TextChanged({
-    $pos = $modelBox.CaretIndex
-    $modelBox.Text = $modelBox.Text.ToUpper()
-    $modelBox.CaretIndex = $pos
+# AUTO UPPERCASE
+$textbox.Add_TextChanged({
+    $pos = $textbox.SelectionStart
+    $textbox.Text = $textbox.Text.ToUpper()
+    $textbox.SelectionStart = $pos
 })
 
-# ===== START FUNCTION =====
+# START FUNCTION
 function Start-Tool {
-    $model = $modelBox.Text.Trim()
+    $model = $textbox.Text.Trim()
 
     if (-not $model) {
-        $statusLabel.Text = "Enter a model."
+        $status.Text = "Enter a model."
         return
     }
 
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        Download-Run $tool $statusLabel
+        Download-Run $tool $status
     } else {
-        $statusLabel.Text = "Model not added."
+        $status.Text = "Model not added."
     }
 }
 
-# BUTTON
-$startBtn.Add_Click({ Start-Tool })
+# BUTTON CLICK
+$button.Add_Click({ Start-Tool })
 
 # ENTER KEY
-$modelBox.Add_KeyDown({
-    if ($_.Key -eq "Return") {
+$textbox.Add_KeyDown({
+    if ($_.KeyCode -eq "Enter") {
         Start-Tool
     }
 })
 
-# RUN
-$window.ShowDialog() | Out-Null
+# RUN APP
+$form.ShowDialog()
