@@ -98,7 +98,7 @@ $form.Controls.Add($title)
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
-$seriesCombo.Location = New-Object System.Drawing.Point(30,70)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,90)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $form.Controls.Add($seriesCombo)
 
@@ -106,7 +106,7 @@ $form.Controls.Add($seriesCombo)
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
-$searchBox.Location = New-Object System.Drawing.Point(270,70)
+$searchBox.Location = New-Object System.Drawing.Point(270,90)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
@@ -114,8 +114,8 @@ $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { 
 
 # LISTBOX (shorter height)
 $modelList = New-Object System.Windows.Forms.ListBox
-$modelList.Location = New-Object System.Drawing.Point(30,120)
-$modelList.Size = New-Object System.Drawing.Size(490,220)
+$modelList.Location = New-Object System.Drawing.Point(30,140)
+$modelList.Size = New-Object System.Drawing.Size(490,200)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
@@ -139,7 +139,7 @@ $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
 
-# STATUS BAR
+# STATUS BAR (default/light)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -156,9 +156,11 @@ $form.Controls.Add($statusStrip)
 # ===================
 # EVENTS
 # ===================
-
 $form.Add_Shown({
+    # Center title slightly lower
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
+    $title.Top = 20
+
     # Preload L-Series
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
