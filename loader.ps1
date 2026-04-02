@@ -11,7 +11,7 @@ $tools = @(
     @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"}
 )
 
-# TEMP DIRECTORY
+# ===== TEMP DIRECTORY =====
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
@@ -112,7 +112,7 @@ function Download-Run($tool, $statusLabel) {
 </Window>
 "@
 
-# LOAD UI
+# ===== LOAD UI =====
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
@@ -120,20 +120,20 @@ $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
 
-# AUTOFOCUS (WORKING FIX)
+# ===== AUTOFOCUS (REAL WORKING FIX) =====
 $window.Dispatcher.InvokeAsync({
     $modelBox.Focus()
     [System.Windows.Input.Keyboard]::Focus($modelBox)
 })
 
-# AUTO UPPERCASE
+# ===== AUTO UPPERCASE =====
 $modelBox.Add_TextChanged({
     $pos = $modelBox.CaretIndex
     $modelBox.Text = $modelBox.Text.ToUpper()
     $modelBox.CaretIndex = $pos
 })
 
-# START FUNCTION
+# ===== START FUNCTION =====
 function Start-Tool {
     $model = $modelBox.Text.Trim()
 
@@ -151,15 +151,15 @@ function Start-Tool {
     }
 }
 
-# BUTTON
+# ===== BUTTON CLICK =====
 $startBtn.Add_Click({ Start-Tool })
 
-# ENTER KEY
+# ===== ENTER KEY SUPPORT =====
 $modelBox.Add_KeyDown({
     if ($_.Key -eq "Return") {
         Start-Tool
     }
 })
 
-# RUN
+# ===== RUN APP =====
 $window.ShowDialog() | Out-Null
