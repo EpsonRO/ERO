@@ -108,7 +108,7 @@ $form.Controls.Add($statusStrip)
 
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 45   # 🔥 FINAL PERFECT POSITION
+    $title.Top = ($textbox.Top / 2) - ($title.Height / 2)
     $textbox.Focus()
 })
 
