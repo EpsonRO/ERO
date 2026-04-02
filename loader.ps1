@@ -55,46 +55,57 @@ function Download-Run($tool) {
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Epson Resetter"
-$form.Size = New-Object System.Drawing.Size(400,250)
+$form.Size = New-Object System.Drawing.Size(420,260)
 $form.StartPosition = "CenterScreen"
+$form.BackColor = "#1e1e1e"
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.Font = New-Object System.Drawing.Font("Arial",12,[System.Drawing.FontStyle]::Bold)
+$title.ForeColor = "Cyan"
+$title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(90,20)
+$title.Location = New-Object System.Drawing.Point(70,20)
 $form.Controls.Add($title)
 
 # LABEL
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Enter Printer Model:"
-$label.Location = New-Object System.Drawing.Point(30,70)
+$label.ForeColor = "LightGray"
+$label.Location = New-Object System.Drawing.Point(30,80)
 $form.Controls.Add($label)
 
 # TEXTBOX
 $textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Size = New-Object System.Drawing.Size(320,25)
-$textbox.Location = New-Object System.Drawing.Point(30,95)
+$textbox.Size = New-Object System.Drawing.Size(340,28)
+$textbox.Location = New-Object System.Drawing.Point(30,105)
+$textbox.BackColor = "#2d2d30"
+$textbox.ForeColor = "White"
+$textbox.BorderStyle = "FixedSingle"
 $form.Controls.Add($textbox)
 
 # BUTTON
 $button = New-Object System.Windows.Forms.Button
-$button.Text = "Start"
-$button.Size = New-Object System.Drawing.Size(320,30)
-$button.Location = New-Object System.Drawing.Point(30,130)
+$button.Text = "START"
+$button.Size = New-Object System.Drawing.Size(340,35)
+$button.Location = New-Object System.Drawing.Point(30,145)
+$button.BackColor = "#0078D7"
+$button.ForeColor = "White"
+$button.FlatStyle = "Flat"
 $form.Controls.Add($button)
 
 # STATUS
 $status = New-Object System.Windows.Forms.Label
-$status.Text = ""
+$status.Text = "Ready"
+$status.ForeColor = "Gray"
 $status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(30,170)
+$status.Location = New-Object System.Drawing.Point(170,190)
 $form.Controls.Add($status)
 
-# ===== AUTOFOCUS (SIMPLE & RELIABLE) =====
+# ===== AUTOFOCUS (FIXED PROPERLY) =====
 $form.Add_Shown({
-    $textbox.Select()
+    $form.Activate()
+    $textbox.Focus()
 })
 
 # AUTO UPPERCASE
