@@ -5,10 +5,10 @@ Add-Type -AssemblyName System.Drawing
 # SERIES & MODELS DATA
 # =========================
 $seriesModels = @{
-    "L-Series" = @("L110","L120","L121","L125","L130","L132","L200","L210","L220","L222","L300","L301","L303","L310","L311","L312","L313","L315","L350","L351","L353","L355","L360","L361","L363","L365","L380","L382","L383","L405","L415","L6160","L6170","L6190")
-    "EcoTank"  = @("ET-2650","ET-2750","ET-2850","ET-3600","ET-3700","ET-4750","ET-4800","ET-4850","ET-5800","ET-5850","ET-7700","ET-7750","ET-8500")
-    "XP-Series" = @("XP-2100","XP-3100","XP-4100","XP-5100","XP-6000")
-    "WF-Series" = @("WF-2830","WF-2850","WF-2860","WF-3730","WF-3750","WF-3800","WF-3820","WF-4010","WF-4830")
+    "L-Series"   = @("L110","L120","L121","L125","L130","L132","L200","L210","L220","L222","L300","L301","L303","L310","L311","L312","L313","L315","L350","L351","L353","L355","L360","L361","L363","L365","L380","L382","L383","L405","L415","L6160","L6170","L6190")
+    "EcoTank"    = @("ET-2650","ET-2750","ET-2850","ET-3600","ET-3700","ET-4750","ET-4800","ET-4850","ET-5800","ET-5850","ET-7700","ET-7750","ET-8500")
+    "XP-Series"  = @("XP-2100","XP-3100","XP-4100","XP-5100","XP-6000")
+    "WF-Series"  = @("WF-2830","WF-2850","WF-2860","WF-3730","WF-3750","WF-3800","WF-3820","WF-4010","WF-4830")
 }
 
 # =========================
@@ -41,18 +41,22 @@ function Download-Run($tool) {
     [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
     $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { $statusLabel.Text = "Launching..."; Start-Process $exe.FullName -Wait; $statusLabel.Text = "Done!" }
+    if ($exe) { 
+        $statusLabel.Text = "Launching..."
+        Start-Process $exe.FullName -Wait
+        $statusLabel.Text = "Done!" 
+    }
     else { $statusLabel.Text = "Executable not found." }
 
     $buttonDownload.Enabled = $true
 }
 
 # =========================
-# UI BUILD
+# FORM BUILD
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(580,500)
+$form.Size = New-Object System.Drawing.Size(580,520)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -70,7 +74,7 @@ $form.Controls.Add($title)
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
-$seriesCombo.Location = New-Object System.Drawing.Point(30,100)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,80)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $form.Controls.Add($seriesCombo)
 
@@ -78,7 +82,7 @@ $form.Controls.Add($seriesCombo)
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
-$searchBox.Location = New-Object System.Drawing.Point(270,100)
+$searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
@@ -86,8 +90,8 @@ $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { 
 
 # LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
-$modelList.Location = New-Object System.Drawing.Point(30,140)
-$modelList.Size = New-Object System.Drawing.Size(490,200)
+$modelList.Location = New-Object System.Drawing.Point(30,120)
+$modelList.Size = New-Object System.Drawing.Size(490,230)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
@@ -96,14 +100,14 @@ $form.Controls.Add($modelList)
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
 $detailLabel.ForeColor = [System.Drawing.Color]::White
-$detailLabel.Location = New-Object System.Drawing.Point(30,330)  # moved up from 350 to 330
+$detailLabel.Location = New-Object System.Drawing.Point(30,360)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 # DOWNLOAD BUTTON
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "Download & Run"
-$buttonDownload.Location = New-Object System.Drawing.Point(30,370)  # still 370
+$buttonDownload.Location = New-Object System.Drawing.Point(30,400)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
@@ -114,7 +118,7 @@ $form.Controls.Add($buttonDownload)
 # STATUS BAR (light/default)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
-$statusStrip.BackColor = [System.Drawing.SystemColors]::Control  # <-- light
+$statusStrip.BackColor = [System.Drawing.SystemColors]::Control
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -131,13 +135,13 @@ $form.Controls.Add($statusStrip)
 # =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 40
+    $title.Top = 20
 
     # Preload L-Series models
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
 
-    # Activate form (focus)
+    # Activate form
     $form.Activate()
     $form.BringToFront()
 })
