@@ -42,21 +42,31 @@ function Download-Run($tool) {
         return
     }
 
-    $statusLabel.Text = "Extracting..."
+    $statusLabel.Text = "Cleaning previous extraction..."
     $form.Refresh()
 
     $ExtractDir = Join-Path $OutDir $tool.Model
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue }
     New-Item -ItemType Directory -Path $ExtractDir | Out-Null
 
+    $statusLabel.Text = "Extracting..."
+    $form.Refresh()
+
+    # Manual extraction to allow overwriting
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    try {
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-    } catch [System.IO.IOException] {
-        Remove-Item $ExtractDir -Recurse -Force
-        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($OutFile)
+    foreach ($entry in $zip.Entries) {
+        $target = Join-Path $ExtractDir $entry.FullName
+        $targetDir = Split-Path $target -Parent
+        if (-not (Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir | Out-Null }
+        if (Test-Path $target) { Remove-Item $target -Force }
+        $entryStream = $entry.Open()
+        $fileStream = [System.IO.File]::OpenWrite($target)
+        $entryStream.CopyTo($fileStream)
+        $fileStream.Close()
+        $entryStream.Close()
     }
+    $zip.Dispose()
 
     $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
     if ($exe) {
