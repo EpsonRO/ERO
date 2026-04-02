@@ -1,14 +1,29 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# ===== ALL L-SERIES MODELS =====
+$models = @(
+"L110","L120","L121","L125","L130","L132","L200","L210","L220","L222",
+"L300","L301","L303","L310","L311","L312","L313","L315","L3210","L3215",
+"L3216","L3250","L3251","L3256","L3260","L350","L351","L353","L355",
+"L360","L361","L363","L365","L380","L382","L383","L385","L405","L415",
+"L4160","L450","L455","L456","L475","L485","L486","L5190","L5290",
+"L550","L555","L565","L575","L605","L6160","L6170","L6190","L6270",
+"L6290","L6490","L655","L6570","L6580","L805","L810","L850","L1110",
+"L1118","L3110","L3115","L3116","L3150","L3151","L3156","L1300","L1800"
+)
+
+# ===== AVAILABLE TOOLS (ONLY WITH LINKS) =====
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
 
+# ===== TEMP DIRECTORY =====
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
+# ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool) {
 
     $statusLabel.Text = "Downloading..."
@@ -47,6 +62,7 @@ function Download-Run($tool) {
     }
 }
 
+# ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(420,300)
@@ -55,6 +71,7 @@ $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
+# ===== TITLE =====
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
 $title.ForeColor = [System.Drawing.Color]::White
@@ -62,12 +79,14 @@ $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontS
 $title.AutoSize = $true
 $form.Controls.Add($title)
 
+# ===== LABEL =====
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Printer Model"
 $label.ForeColor = [System.Drawing.Color]::Silver
 $label.Location = New-Object System.Drawing.Point(30,90)
 $form.Controls.Add($label)
 
+# ===== TEXTBOX =====
 $textbox = New-Object System.Windows.Forms.TextBox
 $textbox.Size = New-Object System.Drawing.Size(340,28)
 $textbox.Location = New-Object System.Drawing.Point(30,115)
@@ -75,6 +94,7 @@ $textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $textbox.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($textbox)
 
+# ===== BUTTON =====
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
 $button.Size = New-Object System.Drawing.Size(340,38)
@@ -85,6 +105,7 @@ $button.FlatStyle = "Flat"
 $button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
+# ===== STATUS BAR =====
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
 $statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
@@ -106,12 +127,14 @@ $statusStrip.Items.Add($copyright) | Out-Null
 
 $form.Controls.Add($statusStrip)
 
+# ===== CENTER TITLE PERFECTLY =====
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
     $title.Top = ($textbox.Top / 2) - ($title.Height / 2)
     $textbox.Focus()
 })
 
+# ===== EVENTS =====
 $textbox.Add_TextChanged({
     $pos = $textbox.SelectionStart
     $textbox.Text = $textbox.Text.ToUpper()
@@ -126,12 +149,17 @@ function Start-Tool {
         return
     }
 
+    if ($models -notcontains $model) {
+        $statusLabel.Text = "INVALID MODEL!"
+        return
+    }
+
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
         Download-Run $tool
     } else {
-        $statusLabel.Text = "Model not added."
+        $statusLabel.Text = "PRINTER MODEL NOT FOUND!"
     }
 }
 
