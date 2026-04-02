@@ -55,57 +55,69 @@ function Download-Run($tool) {
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Epson Resetter"
-$form.Size = New-Object System.Drawing.Size(420,260)
+$form.Size = New-Object System.Drawing.Size(440,280)
 $form.StartPosition = "CenterScreen"
-$form.BackColor = "#1b1b1b"
+$form.BackColor = [System.Drawing.Color]::FromArgb(24,24,24)
+$form.FormBorderStyle = "FixedSingle"
+$form.MaximizeBox = $false
 
-# TITLE
+# ===== TITLE =====
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER"
-$title.ForeColor = "White"
-$title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
+$title.ForeColor = [System.Drawing.Color]::White
+$title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $title.Location = New-Object System.Drawing.Point(110,20)
 $form.Controls.Add($title)
 
-# LABEL
-$label = New-Object System.Windows.Forms.Label
-$label.Text = "Printer Model"
-$label.ForeColor = "#cccccc"
-$label.Location = New-Object System.Drawing.Point(30,80)
-$form.Controls.Add($label)
+# ===== SUBTITLE =====
+$subtitle = New-Object System.Windows.Forms.Label
+$subtitle.Text = "Enter your printer model"
+$subtitle.ForeColor = [System.Drawing.Color]::Gray
+$subtitle.AutoSize = $true
+$subtitle.Location = New-Object System.Drawing.Point(130,55)
+$form.Controls.Add($subtitle)
 
-# TEXTBOX
+# ===== TEXTBOX =====
 $textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Size = New-Object System.Drawing.Size(340,30)
-$textbox.Location = New-Object System.Drawing.Point(30,105)
-$textbox.BackColor = "#2d2d30"
-$textbox.ForeColor = "White"
+$textbox.Size = New-Object System.Drawing.Size(360,30)
+$textbox.Location = New-Object System.Drawing.Point(35,90)
+$textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
+$textbox.ForeColor = [System.Drawing.Color]::White
 $textbox.BorderStyle = "FixedSingle"
+$textbox.Font = New-Object System.Drawing.Font("Segoe UI",10)
 $form.Controls.Add($textbox)
 
-# BUTTON (BLUE)
+# ===== BUTTON =====
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
-$button.Size = New-Object System.Drawing.Size(340,40)
-$button.Location = New-Object System.Drawing.Point(30,145)
-$button.BackColor = "#0078D7"
-$button.ForeColor = "White"
+$button.Size = New-Object System.Drawing.Size(360,45)
+$button.Location = New-Object System.Drawing.Point(35,135)
+$button.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
+$button.ForeColor = [System.Drawing.Color]::White
 $button.FlatStyle = "Flat"
+$button.Font = New-Object System.Drawing.Font("Segoe UI",10,[System.Drawing.FontStyle]::Bold)
+$button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
-# STATUS
+# 🔵 HOVER EFFECT
+$button.Add_MouseEnter({
+    $button.BackColor = [System.Drawing.Color]::FromArgb(0,100,190)
+})
+$button.Add_MouseLeave({
+    $button.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
+})
+
+# ===== STATUS =====
 $status = New-Object System.Windows.Forms.Label
 $status.Text = "Ready"
-$status.ForeColor = "#aaaaaa"
+$status.ForeColor = [System.Drawing.Color]::Gray
 $status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(170,195)
+$status.Location = New-Object System.Drawing.Point(190,195)
 $form.Controls.Add($status)
 
-# ===== AUTOFOCUS (REAL WORKING) =====
+# ===== AUTOFOCUS =====
 $form.Add_Shown({
-    $form.Activate()
-    Start-Sleep -Milliseconds 100
     $textbox.Focus()
 })
 
@@ -116,7 +128,7 @@ $textbox.Add_TextChanged({
     $textbox.SelectionStart = $pos
 })
 
-# START FUNCTION
+# ===== START FUNCTION =====
 function Start-Tool {
     $model = $textbox.Text.Trim()
 
@@ -130,11 +142,11 @@ function Start-Tool {
     if ($tool) {
         Download-Run $tool
     } else {
-        $status.Text = "Printer model not added."
+        $status.Text = "Model not added."
     }
 }
 
-# BUTTON
+# BUTTON CLICK
 $button.Add_Click({ Start-Tool })
 
 # ENTER KEY
