@@ -57,37 +57,37 @@ $form = New-Object System.Windows.Forms.Form
 $form.Text = "Epson Resetter"
 $form.Size = New-Object System.Drawing.Size(420,260)
 $form.StartPosition = "CenterScreen"
-$form.BackColor = "#1e1e1e"
+$form.BackColor = "#1b1b1b"
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
-$title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = "Cyan"
+$title.Text = "EPSON RESETTER"
+$title.ForeColor = "White"
 $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(70,20)
+$title.Location = New-Object System.Drawing.Point(110,20)
 $form.Controls.Add($title)
 
 # LABEL
 $label = New-Object System.Windows.Forms.Label
-$label.Text = "Enter Printer Model:"
-$label.ForeColor = "LightGray"
+$label.Text = "Printer Model"
+$label.ForeColor = "#cccccc"
 $label.Location = New-Object System.Drawing.Point(30,80)
 $form.Controls.Add($label)
 
 # TEXTBOX
 $textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Size = New-Object System.Drawing.Size(340,28)
+$textbox.Size = New-Object System.Drawing.Size(340,30)
 $textbox.Location = New-Object System.Drawing.Point(30,105)
 $textbox.BackColor = "#2d2d30"
 $textbox.ForeColor = "White"
 $textbox.BorderStyle = "FixedSingle"
 $form.Controls.Add($textbox)
 
-# BUTTON
+# BUTTON (BLUE)
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
-$button.Size = New-Object System.Drawing.Size(340,35)
+$button.Size = New-Object System.Drawing.Size(340,40)
 $button.Location = New-Object System.Drawing.Point(30,145)
 $button.BackColor = "#0078D7"
 $button.ForeColor = "White"
@@ -97,14 +97,15 @@ $form.Controls.Add($button)
 # STATUS
 $status = New-Object System.Windows.Forms.Label
 $status.Text = "Ready"
-$status.ForeColor = "Gray"
+$status.ForeColor = "#aaaaaa"
 $status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(170,190)
+$status.Location = New-Object System.Drawing.Point(170,195)
 $form.Controls.Add($status)
 
-# ===== AUTOFOCUS (FIXED PROPERLY) =====
+# ===== AUTOFOCUS (REAL WORKING) =====
 $form.Add_Shown({
     $form.Activate()
+    Start-Sleep -Milliseconds 100
     $textbox.Focus()
 })
 
@@ -133,7 +134,7 @@ function Start-Tool {
     }
 }
 
-# BUTTON CLICK
+# BUTTON
 $button.Add_Click({ Start-Tool })
 
 # ENTER KEY
