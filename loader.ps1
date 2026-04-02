@@ -1,6 +1,5 @@
-# FORCE STA MODE CHECK
+# FORCE STA MODE
 if ([Threading.Thread]::CurrentThread.ApartmentState -ne "STA") {
-    Write-Host "Restarting in STA mode..."
     powershell -STA -File $PSCommandPath
     exit
 }
@@ -9,7 +8,8 @@ Add-Type -AssemblyName PresentationFramework
 
 # ===== TOOL DATABASE =====
 $tools = @(
-    @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"}
+    @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"},
+    @{Model="L3110"; Name="Resetter"; Url="https://example.com/L3110.zip"; File="L3110.zip"; Type="zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = "$env:USERPROFILE\Downloads\ERO-Tools"
@@ -17,18 +17,19 @@ if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
 
+# ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool, $statusLabel) {
-    $statusLabel.Content = "Downloading..."
+    $statusLabel.Text = "Downloading..."
     $OutFile = "$OutDir\$($tool.File)"
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile
     } catch {
-        $statusLabel.Content = "Download failed."
+        $statusLabel.Text = "Download failed."
         return
     }
 
-    $statusLabel.Content = "Extracting..."
+    $statusLabel.Text = "Extracting..."
 
     $ExtractDir = "$OutDir\$($tool.Model)"
     if (-not (Test-Path $ExtractDir)) {
@@ -43,15 +44,15 @@ function Download-Run($tool, $statusLabel) {
            Select-Object -First 1
 
     if ($exe) {
-        $statusLabel.Content = "Launching..."
+        $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName
-        $statusLabel.Content = "Done!"
+        $statusLabel.Text = "Done!"
     } else {
-        $statusLabel.Content = "EXE not found."
+        $statusLabel.Text = "EXE not found."
     }
 }
 
-# ===== XAML UI =====
+# ===== UI DESIGN =====
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         Title="Epson Resetter"
@@ -75,7 +76,7 @@ function Download-Run($tool, $statusLabel) {
                            Foreground="#cccccc"/>
 
                 <TextBox Name="ModelBox"
-                         Height="30"
+                         Height="32"
                          Margin="0,5,0,15"
                          Background="#2d2d30"
                          Foreground="White"
@@ -103,23 +104,35 @@ function Download-Run($tool, $statusLabel) {
 </Window>
 "@
 
-# LOAD UI SAFELY
-try {
-    $reader = New-Object System.Xml.XmlNodeReader $xaml
-    $window = [Windows.Markup.XamlReader]::Load($reader)
-} catch {
-    Write-Host "XAML failed to load"
-    exit
-}
+# ===== LOAD UI =====
+$reader = New-Object System.Xml.XmlNodeReader $xaml
+$window = [Windows.Markup.XamlReader]::Load($reader)
 
-# GET CONTROLS
+# ===== GET ELEMENTS =====
 $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
 
-# BUTTON CLICK
-$startBtn.Add_Click({
-    $model = $modelBox.Text.Trim().ToUpper()
+# ===== AUTO-FOCUS (NO CLICK NEEDED) =====
+$window.Add_ContentRendered({
+    $modelBox.Focus()
+})
+
+# ===== AUTO-SELECT TEXT =====
+$modelBox.Add_GotFocus({
+    $modelBox.SelectAll()
+})
+
+# ===== AUTO-UPPERCASE =====
+$modelBox.Add_TextChanged({
+    $cursor = $modelBox.CaretIndex
+    $modelBox.Text = $modelBox.Text.ToUpper()
+    $modelBox.CaretIndex = $cursor
+})
+
+# ===== START FUNCTION =====
+function Start-Tool {
+    $model = $modelBox.Text.Trim()
 
     if (-not $model) {
         $statusLabel.Text = "Enter a model."
@@ -134,7 +147,19 @@ $startBtn.Add_Click({
     } else {
         $statusLabel.Text = "Model not added."
     }
+}
+
+# BUTTON CLICK
+$startBtn.Add_Click({
+    Start-Tool
 })
 
-# SHOW WINDOW
+# ENTER KEY SUPPORT
+$modelBox.Add_KeyDown({
+    if ($_.Key -eq "Return") {
+        Start-Tool
+    }
+})
+
+# ===== RUN APP =====
 $window.ShowDialog() | Out-Null
