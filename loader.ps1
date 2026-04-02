@@ -55,7 +55,7 @@ function Download-Run($tool) {
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(420,300)  # 🔥 increased height
+$form.Size = New-Object System.Drawing.Size(420,300)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -67,8 +67,13 @@ $title.Text = "EPSON RESETTER ONLINE"
 $title.ForeColor = [System.Drawing.Color]::White
 $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(55,20)
 $form.Controls.Add($title)
+
+# 🔥 CENTER TITLE DYNAMICALLY
+$form.Add_Shown({
+    $title.Left = ($form.ClientSize.Width - $title.Width) / 2
+    $textbox.Focus()
+})
 
 # ===== LABEL =====
 $label = New-Object System.Windows.Forms.Label
@@ -98,20 +103,16 @@ $form.Controls.Add($button)
 
 # ===== STATUS BAR =====
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
-$statusStrip.Dock = "Bottom"   # 🔥 force bottom
-$statusStrip.SizingGrip = $false
+$statusStrip.Dock = "Bottom"
 $statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 
-# LEFT TEXT
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
 $statusLabel.ForeColor = [System.Drawing.Color]::White
 
-# SPACER
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
 $spacer.Spring = $true
 
-# COPYRIGHT RIGHT
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
 $copyright.ForeColor = [System.Drawing.Color]::Gray
@@ -120,21 +121,16 @@ $statusStrip.Items.Add($statusLabel) | Out-Null
 $statusStrip.Items.Add($spacer) | Out-Null
 $statusStrip.Items.Add($copyright) | Out-Null
 
+# 🔥 IMPORTANT: ADD LAST
 $form.Controls.Add($statusStrip)
 
-# ===== AUTOFOCUS =====
-$form.Add_Shown({
-    $textbox.Focus()
-})
-
-# ===== UPPERCASE =====
+# ===== EVENTS =====
 $textbox.Add_TextChanged({
     $pos = $textbox.SelectionStart
     $textbox.Text = $textbox.Text.ToUpper()
     $textbox.SelectionStart = $pos
 })
 
-# ===== START =====
 function Start-Tool {
     $model = $textbox.Text.Trim()
 
