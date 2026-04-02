@@ -1,6 +1,16 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# ===== WINDOWS API (FORCE FOCUS) =====
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WinAPI {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+
 # ===== TOOL DATABASE =====
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
@@ -58,6 +68,7 @@ $form.Text = "Epson Resetter"
 $form.Size = New-Object System.Drawing.Size(400,250)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = "#1b1b1b"
+$form.TopMost = $true   # 🔥 force on top
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
@@ -96,11 +107,15 @@ $status.AutoSize = $true
 $status.Location = New-Object System.Drawing.Point(150,180)
 $form.Controls.Add($status)
 
-# ===== AUTOFOCUS (REAL FIX) =====
+# ===== FORCE FOCUS =====
 $form.Add_Shown({
-    $form.Activate()
-    Start-Sleep -Milliseconds 100
-    $form.ActiveControl = $textbox
+    Start-Sleep -Milliseconds 200
+
+    # Bring window to front
+    [WinAPI]::ShowWindow($form.Handle, 5)
+    [WinAPI]::SetForegroundWindow($form.Handle)
+
+    # Force textbox focus
     $textbox.Focus()
 })
 
@@ -129,7 +144,7 @@ function Start-Tool {
     }
 }
 
-# BUTTON CLICK
+# BUTTON
 $button.Add_Click({ Start-Tool })
 
 # ENTER KEY
@@ -139,5 +154,5 @@ $textbox.Add_KeyDown({
     }
 })
 
-# RUN APP
+# RUN
 [void]$form.ShowDialog()
