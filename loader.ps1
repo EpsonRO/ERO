@@ -36,7 +36,6 @@ $seriesModels = @{
 # ===================
 # AVAILABLE TOOLS (WITH DOWNLOAD LINKS)
 # ===================
-# Add tools here as they become available
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
@@ -45,9 +44,7 @@ $tools = @(
 # TEMP OUTPUT DIRECTORY
 # ===================
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
-if (Test-Path $OutDir) {
-    Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue
-}
+if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # ===================
@@ -84,7 +81,6 @@ function Download-Run($tool) {
     if ($exe) {
         $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName -Wait
-
         $statusLabel.Text = "Done!"
     } else {
         $statusLabel.Text = "Executable not found."
@@ -120,12 +116,27 @@ $seriesCombo.Location = New-Object System.Drawing.Point(30,100)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $form.Controls.Add($seriesCombo)
 
-# SEARCH BOX
+# SEARCH BOX (with watermark workaround)
 $searchBox = New-Object System.Windows.Forms.TextBox
-$searchBox.PlaceholderText = "Search model..."
+$searchBox.Text = "Search model..."
+$searchBox.ForeColor = [System.Drawing.Color]::Gray
 $searchBox.Location = New-Object System.Drawing.Point(270,100)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
+
+$searchBox.Add_GotFocus({
+    if ($searchBox.Text -eq "Search model...") {
+        $searchBox.Text = ""
+        $searchBox.ForeColor = [System.Drawing.Color]::White
+    }
+})
+
+$searchBox.Add_LostFocus({
+    if ([string]::IsNullOrWhiteSpace($searchBox.Text)) {
+        $searchBox.Text = "Search model..."
+        $searchBox.ForeColor = [System.Drawing.Color]::Gray
+    }
+})
 
 # LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
@@ -157,16 +168,12 @@ $form.Controls.Add($buttonDownload)
 # STATUS BAR
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
-
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
-
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
 $spacer.Spring = $true
-
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
-
 $statusStrip.Items.Add($statusLabel)
 $statusStrip.Items.Add($spacer)
 $statusStrip.Items.Add($copyright)
@@ -175,11 +182,7 @@ $form.Controls.Add($statusStrip)
 # ===================
 # UI BEHAVIOR EVENTS
 # ===================
-
-# Center title on show
-$form.Add_Shown({
-    $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-})
+$form.Add_Shown({ $title.Left = ($form.ClientSize.Width - $title.Width) / 2 })
 
 # Series selection
 $seriesCombo.Add_SelectedIndexChanged({
@@ -193,8 +196,9 @@ $seriesCombo.Add_SelectedIndexChanged({
     $buttonDownload.Enabled = $false
 })
 
-# Live search within selected series
+# Live search
 $searchBox.Add_TextChanged({
+    if ($searchBox.Text -eq "Search model...") { return }
     $query = $searchBox.Text.ToUpper()
     $modelList.Items.Clear()
     $selected = $seriesCombo.SelectedItem
@@ -210,18 +214,11 @@ $searchBox.Add_TextChanged({
 $modelList.Add_SelectedIndexChanged({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
-
         $detailLabel.Text = "Model: $selModel"
         $buttonDownload.Enabled = $false
-
-        # Check tool availability
         $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
-        if ($foundTool) {
-            $statusLabel.Text = "Tool available!"
-            $buttonDownload.Enabled = $true
-        } else {
-            $statusLabel.Text = "Tool not available yet."
-        }
+        if ($foundTool) { $statusLabel.Text = "Tool available!"; $buttonDownload.Enabled = $true }
+        else { $statusLabel.Text = "Tool not available yet." }
     }
 })
 
@@ -230,9 +227,7 @@ $buttonDownload.Add_Click({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
         $tool = $tools | Where-Object { $_.Model -eq $selModel }
-        if ($tool) {
-            Download-Run $tool
-        }
+        if ($tool) { Download-Run $tool }
     }
 })
 
