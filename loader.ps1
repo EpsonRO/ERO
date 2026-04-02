@@ -8,19 +8,21 @@ Add-Type -AssemblyName PresentationFramework
 
 # ===== TOOL DATABASE =====
 $tools = @(
-    @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"},
-    @{Model="L3110"; Name="Resetter"; Url="https://example.com/L3110.zip"; File="L3110.zip"; Type="zip"; Exe="AdjProg.exe"}
+    @{Model="L6190"; Name="USBFix"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Type="zip"; Exe="AdjProg.exe"}
 )
 
-$OutDir = "$env:USERPROFILE\Downloads\ERO-Tools"
+# ✅ USE TEMP DIRECTORY
+$OutDir = Join-Path $env:TEMP "ERO-Tools"
+
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
 
 # ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool, $statusLabel) {
+
     $statusLabel.Text = "Downloading..."
-    $OutFile = "$OutDir\$($tool.File)"
+    $OutFile = Join-Path $OutDir $tool.File
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile
@@ -31,13 +33,16 @@ function Download-Run($tool, $statusLabel) {
 
     $statusLabel.Text = "Extracting..."
 
-    $ExtractDir = "$OutDir\$($tool.Model)"
-    if (-not (Test-Path $ExtractDir)) {
-        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+    $ExtractDir = Join-Path $OutDir $tool.Model
+
+    if (Test-Path $ExtractDir) {
+        Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
+    New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir, $true)
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
     $exe = Get-ChildItem -Path $ExtractDir -Recurse |
            Where-Object { $_.Name -ieq $tool.Exe } |
@@ -45,14 +50,21 @@ function Download-Run($tool, $statusLabel) {
 
     if ($exe) {
         $statusLabel.Text = "Launching..."
-        Start-Process $exe.FullName
+        Start-Process $exe.FullName -Wait
+
+        $statusLabel.Text = "Cleaning up..."
+
+        # ✅ DELETE FILES AFTER RUN
+        Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
+
         $statusLabel.Text = "Done!"
     } else {
         $statusLabel.Text = "EXE not found."
     }
 }
 
-# ===== UI DESIGN =====
+# ===== UI =====
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         Title="Epson Resetter"
@@ -89,8 +101,7 @@ function Download-Run($tool, $statusLabel) {
                         Background="#0078D7"
                         Foreground="White"
                         FontWeight="Bold"
-                        BorderThickness="0"
-                        Cursor="Hand"/>
+                        BorderThickness="0"/>
 
                 <TextBlock Name="StatusLabel"
                            Text="Ready"
@@ -104,33 +115,28 @@ function Download-Run($tool, $statusLabel) {
 </Window>
 "@
 
-# ===== LOAD UI =====
+# LOAD UI
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
-# ===== GET ELEMENTS =====
 $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
 
-# ===== AUTO-FOCUS (NO CLICK NEEDED) =====
-$window.Add_ContentRendered({
+# ✅ REAL AUTOFOCUS FIX
+$window.Dispatcher.InvokeAsync({
     $modelBox.Focus()
+    [System.Windows.Input.Keyboard]::Focus($modelBox)
 })
 
-# ===== AUTO-SELECT TEXT =====
-$modelBox.Add_GotFocus({
-    $modelBox.SelectAll()
-})
-
-# ===== AUTO-UPPERCASE =====
+# AUTO UPPERCASE
 $modelBox.Add_TextChanged({
-    $cursor = $modelBox.CaretIndex
+    $pos = $modelBox.CaretIndex
     $modelBox.Text = $modelBox.Text.ToUpper()
-    $modelBox.CaretIndex = $cursor
+    $modelBox.CaretIndex = $pos
 })
 
-# ===== START FUNCTION =====
+# START FUNCTION
 function Start-Tool {
     $model = $modelBox.Text.Trim()
 
@@ -149,17 +155,15 @@ function Start-Tool {
     }
 }
 
-# BUTTON CLICK
-$startBtn.Add_Click({
-    Start-Tool
-})
+# BUTTON
+$startBtn.Add_Click({ Start-Tool })
 
-# ENTER KEY SUPPORT
+# ENTER KEY
 $modelBox.Add_KeyDown({
     if ($_.Key -eq "Return") {
         Start-Tool
     }
 })
 
-# ===== RUN APP =====
+# RUN
 $window.ShowDialog() | Out-Null
