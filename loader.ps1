@@ -1,58 +1,75 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# 🔥 FORCE FOREGROUND (WINAPI)
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class Win32 {
-    [DllImport("user32.dll")]
-    public static extern bool SetForegroundWindow(IntPtr hWnd);
+# ===================
+# SERIES & MODELS DATA
+# ===================
+$seriesModels = @{
+    "L-Series" = @(
+        "L110","L120","L121","L125","L130","L132","L200","L210","L220",
+        "L222","L300","L301","L303","L310","L311","L312","L313","L315",
+        "L350","L351","L353","L355","L360","L361","L363","L365","L380",
+        "L382","L383","L405","L415","L6160","L6170","L6190"
+    )
+    "EcoTank" = @(
+        "ET-2650","ET-2750","ET-2850","ET-3600","ET-3700","ET-4750",
+        "ET-4800","ET-4850","ET-5800","ET-5850","ET-7700","ET-7750","ET-8500"
+    )
+    "XP-Series" = @(
+        "XP-2100","XP-3100","XP-4100","XP-5100","XP-6000"
+    )
+    "WorkForce" = @(
+        "WF-2630","WF-2850","WF-2860","WF-3620","WF-3640","WF-3820",
+        "WF-4830"
+    )
+    "SureColor" = @(
+        "SC-P400","SC-P600","SC-P800","SC-T3100","SC-T5100"
+    )
+    "Expression" = @(
+        "XP-33","XP-55","XP-15000"
+    )
+    "Artisan" = @(
+        "Artisan 1430","Artisan 1500"
+    )
 }
-"@
 
-# ===== ALL L-SERIES MODELS =====
-$models = @(
-    "L100","L110","L1110","L1118","L120","L121","L1216","L1250","L1251","L1256",
-    "L130","L132","L1320","L1300","L1455","L1800","L18050",
-    "L200","L210","L220","L222",
-    "L300","L301","L303",
-    "L310","L311","L3110","L3115","L3116","L312","L313","L315","L3150","L3151","L3156",
-    "L3210","L3211","L3215","L3216","L3250","L3251","L3252","L3256","L3260",
-    "L350","L351","L353","L355","L3550","L3556","L3560",
-    "L360","L361","L363","L365","L380","L382","L383","L385",
-    "L405","L415","L4160","L4260","L4360","L4366","L450","L455","L456","L475",
-    "L485","L486","L5190","L5290","L5296","L550","L555","L565","L575",
-    "L605","L6160","L6170","L6190","L6260","L6270","L6290","L6370","L6390",
-    "L6460","L6490","L655","L6570","L6580",
-    "L805","L8050","L810","L8100","L850",
-    "L1210","L14150","L15150","L15160","L15180"
-)
-
-# ===== AVAILABLE TOOLS =====
+# ===================
+# AVAILABLE TOOLS (WITH DOWNLOAD LINKS)
+# ===================
+# Add tools here as they become available
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
 
-# ===== TEMP DIRECTORY =====
+# ===================
+# TEMP OUTPUT DIRECTORY
+# ===================
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
-if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path $OutDir) {
+    Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
-# ===== DOWNLOAD FUNCTION =====
+# ===================
+# DOWNLOAD + RUN FUNCTION
+# ===================
 function Download-Run($tool) {
-
     $statusLabel.Text = "Downloading..."
+    $buttonDownload.Enabled = $false
+    $form.Refresh()
+
     $OutFile = Join-Path $OutDir $tool.File
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
     } catch {
         $statusLabel.Text = "Download failed."
+        $buttonDownload.Enabled = $true
         return
     }
 
     $statusLabel.Text = "Extracting..."
+    $form.Refresh()
 
     $ExtractDir = Join-Path $OutDir $tool.Model
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
@@ -68,136 +85,165 @@ function Download-Run($tool) {
         $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName -Wait
 
-        $statusLabel.Text = "Cleaning..."
-        Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
-
         $statusLabel.Text = "Done!"
     } else {
-        $statusLabel.Text = "EXE not found."
+        $statusLabel.Text = "Executable not found."
     }
+
+    $buttonDownload.Enabled = $true
 }
 
-# ===== FORM =====
+# ===================
+# UI BUILD
+# ===================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(420,300)
+$form.Size = New-Object System.Drawing.Size(580,650)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
-# ===== TITLE =====
+# TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
 $title.ForeColor = [System.Drawing.Color]::White
-$title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
+$title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
 
-# ===== LABEL =====
-$label = New-Object System.Windows.Forms.Label
-$label.Text = "Printer Model"
-$label.ForeColor = [System.Drawing.Color]::Silver
-$label.Location = New-Object System.Drawing.Point(30,90)
-$form.Controls.Add($label)
+# SERIES COMBOBOX
+$seriesCombo = New-Object System.Windows.Forms.ComboBox
+$seriesCombo.DropDownStyle = 'DropDownList'
+$seriesCombo.Items.AddRange($seriesModels.Keys)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,100)
+$seriesCombo.Size = New-Object System.Drawing.Size(220,30)
+$form.Controls.Add($seriesCombo)
 
-# ===== TEXTBOX =====
-$textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Size = New-Object System.Drawing.Size(340,28)
-$textbox.Location = New-Object System.Drawing.Point(30,115)
-$textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$textbox.ForeColor = [System.Drawing.Color]::White
-$form.Controls.Add($textbox)
+# SEARCH BOX
+$searchBox = New-Object System.Windows.Forms.TextBox
+$searchBox.PlaceholderText = "Search model..."
+$searchBox.Location = New-Object System.Drawing.Point(270,100)
+$searchBox.Size = New-Object System.Drawing.Size(250,30)
+$form.Controls.Add($searchBox)
 
-# ===== BUTTON =====
-$button = New-Object System.Windows.Forms.Button
-$button.Text = "START"
-$button.Size = New-Object System.Drawing.Size(340,38)
-$button.Location = New-Object System.Drawing.Point(30,155)
-$button.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
-$button.ForeColor = [System.Drawing.Color]::White
-$button.FlatStyle = "Flat"
-$button.FlatAppearance.BorderSize = 0
-$form.Controls.Add($button)
+# LISTBOX
+$modelList = New-Object System.Windows.Forms.ListBox
+$modelList.Location = New-Object System.Drawing.Point(30,150)
+$modelList.Size = New-Object System.Drawing.Size(490,320)
+$modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
+$modelList.ForeColor = [System.Drawing.Color]::White
+$form.Controls.Add($modelList)
 
-# ===== STATUS BAR =====
+# DETAILS LABEL
+$detailLabel = New-Object System.Windows.Forms.Label
+$detailLabel.Text = "Model: (none selected)"
+$detailLabel.ForeColor = [System.Drawing.Color]::White
+$detailLabel.Location = New-Object System.Drawing.Point(30,490)
+$detailLabel.Size = New-Object System.Drawing.Size(450,30)
+$form.Controls.Add($detailLabel)
+
+# DOWNLOAD BUTTON
+$buttonDownload = New-Object System.Windows.Forms.Button
+$buttonDownload.Text = "Download & Run"
+$buttonDownload.Location = New-Object System.Drawing.Point(30,530)
+$buttonDownload.Size = New-Object System.Drawing.Size(490,40)
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
+$buttonDownload.ForeColor = [System.Drawing.Color]::White
+$buttonDownload.FlatStyle = "Flat"
+$buttonDownload.Enabled = $false
+$form.Controls.Add($buttonDownload)
+
+# STATUS BAR
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
-$statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
-$statusLabel.ForeColor = [System.Drawing.Color]::White
 
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
 $spacer.Spring = $true
 
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
-$copyright.ForeColor = [System.Drawing.Color]::Gray
 
-$statusStrip.Items.Add($statusLabel) | Out-Null
-$statusStrip.Items.Add($spacer) | Out-Null
-$statusStrip.Items.Add($copyright) | Out-Null
-
+$statusStrip.Items.Add($statusLabel)
+$statusStrip.Items.Add($spacer)
+$statusStrip.Items.Add($copyright)
 $form.Controls.Add($statusStrip)
 
-# ===== CENTER + FORCE FOCUS =====
+# ===================
+# UI BEHAVIOR EVENTS
+# ===================
+
+# Center title on show
 $form.Add_Shown({
-
-    # Center title
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = ($textbox.Top / 2) - ($title.Height / 2)
-
-    # 🔥 FORCE WINDOW TO FRONT
-    $form.TopMost = $true
-    $form.Activate()
-    $form.Focus()
-    [Win32]::SetForegroundWindow($form.Handle)
-
-    Start-Sleep -Milliseconds 200
-    $form.TopMost = $false
-
-    # Focus textbox
-    $textbox.Focus()
 })
 
-# ===== EVENTS =====
-$textbox.Add_TextChanged({
-    $pos = $textbox.SelectionStart
-    $textbox.Text = $textbox.Text.ToUpper()
-    $textbox.SelectionStart = $pos
+# Series selection
+$seriesCombo.Add_SelectedIndexChanged({
+    $selectedSeries = $seriesCombo.SelectedItem
+    $modelList.Items.Clear()
+    if ($selectedSeries) {
+        $seriesModels[$selectedSeries] | ForEach-Object { $modelList.Items.Add($_) }
+        $statusLabel.Text = "Showing models for $selectedSeries"
+    }
+    $detailLabel.Text = "Model: (none selected)"
+    $buttonDownload.Enabled = $false
 })
 
-function Start-Tool {
-    $model = $textbox.Text.Trim()
-
-    if (-not $model) {
-        $statusLabel.Text = "Enter a model."
-        return
+# Live search within selected series
+$searchBox.Add_TextChanged({
+    $query = $searchBox.Text.ToUpper()
+    $modelList.Items.Clear()
+    $selected = $seriesCombo.SelectedItem
+    if ($selected) {
+        $seriesModels[$selected] |
+            Where-Object { $_.ToUpper() -like "*$query*" } |
+            ForEach-Object { $modelList.Items.Add($_) }
+        $statusLabel.Text = "Filter: '$query'"
     }
+})
 
-    if ($models -notcontains $model) {
-        $statusLabel.Text = "INVALID MODEL!"
-        return
+# Listbox selection -> show detail
+$modelList.Add_SelectedIndexChanged({
+    $selModel = $modelList.SelectedItem
+    if ($selModel) {
+
+        $detailLabel.Text = "Model: $selModel"
+        $buttonDownload.Enabled = $false
+
+        # Check tool availability
+        $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
+        if ($foundTool) {
+            $statusLabel.Text = "Tool available!"
+            $buttonDownload.Enabled = $true
+        } else {
+            $statusLabel.Text = "Tool not available yet."
+        }
     }
+})
 
-    $tool = $tools | Where-Object { $_.Model -eq $model }
-
-    if ($tool) {
-        Download-Run $tool
-    } else {
-        $statusLabel.Text = "PRINTER MODEL NOT FOUND!"
+# Download & Run button click
+$buttonDownload.Add_Click({
+    $selModel = $modelList.SelectedItem
+    if ($selModel) {
+        $tool = $tools | Where-Object { $_.Model -eq $selModel }
+        if ($tool) {
+            Download-Run $tool
+        }
     }
-}
+})
 
-$button.Add_Click({ Start-Tool })
-
-$textbox.Add_KeyDown({
+# Allow Enter to trigger download
+$modelList.Add_KeyDown({
     if ($_.KeyCode -eq "Enter") {
-        Start-Tool
+        if ($buttonDownload.Enabled) { $buttonDownload.PerformClick() }
     }
 })
 
+# ===================
+# SHOW UI
+# ===================
 $form.ShowDialog()
