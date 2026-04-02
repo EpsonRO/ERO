@@ -1,5 +1,4 @@
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName PresentationFramework
 
 # ===== TOOL DATABASE =====
 $tools = @(
@@ -13,15 +12,18 @@ if (-not (Test-Path $OutDir)) {
 }
 
 # ===== DOWNLOAD FUNCTION =====
-function Download-Run($tool) {
+function Download-Run($tool, $statusLabel) {
+    $statusLabel.Content = "Downloading..."
     $OutFile = "$OutDir\$($tool.File)"
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -UseBasicParsing
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("Download failed!", "Error", "OK", "Error")
+        $statusLabel.Content = "Download failed."
         return
     }
+
+    $statusLabel.Content = "Extracting..."
 
     if ($tool.Type -eq "zip") {
         $ExtractDir = "$OutDir\$($tool.Model)"
@@ -30,70 +32,97 @@ function Download-Run($tool) {
         }
 
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir, $true)
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse |
                Where-Object { $_.Name -ieq $tool.Exe } |
                Select-Object -First 1
 
         if ($exe) {
+            $statusLabel.Content = "Launching tool..."
             Start-Process $exe.FullName
+            $statusLabel.Content = "Done!"
         } else {
-            [System.Windows.Forms.MessageBox]::Show("Executable not found!", "Error")
+            $statusLabel.Content = "Executable not found."
         }
     }
 }
 
-# ===== GUI FORM =====
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "EPSON Resetter Tool"
-$form.Size = New-Object System.Drawing.Size(400,250)
-$form.StartPosition = "CenterScreen"
+# ===== WPF XAML UI =====
+[xml]$xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        Title="Epson Resetter Tool"
+        Height="300" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#1e1e1e">
 
-# TITLE
-$title = New-Object System.Windows.Forms.Label
-$title.Text = "EPSON RESETTER ONLINE"
-$title.Font = New-Object System.Drawing.Font("Arial",14,[System.Drawing.FontStyle]::Bold)
-$title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(60,20)
-$form.Controls.Add($title)
+    <Grid Margin="20">
+        <StackPanel VerticalAlignment="Center">
 
-# INPUT LABEL
-$label = New-Object System.Windows.Forms.Label
-$label.Text = "Enter Printer Model:"
-$label.Location = New-Object System.Drawing.Point(30,80)
-$form.Controls.Add($label)
+            <TextBlock Text="EPSON RESETTER"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,20"/>
 
-# TEXTBOX
-$textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Location = New-Object System.Drawing.Point(30,110)
-$textbox.Size = New-Object System.Drawing.Size(320,20)
-$form.Controls.Add($textbox)
+            <TextBlock Text="Enter Printer Model"
+                       Foreground="#cccccc"
+                       Margin="0,0,0,5"/>
 
-# BUTTON
-$button = New-Object System.Windows.Forms.Button
-$button.Text = "Start"
-$button.Location = New-Object System.Drawing.Point(140,150)
-$form.Controls.Add($button)
+            <TextBox Name="ModelBox"
+                     Height="30"
+                     Background="#2d2d30"
+                     Foreground="White"
+                     BorderBrush="#444"
+                     Padding="5"/>
 
-# BUTTON CLICK EVENT
-$button.Add_Click({
-    $inputModel = $textbox.Text.Trim().ToUpper()
+            <Button Name="StartBtn"
+                    Content="START"
+                    Height="35"
+                    Margin="0,15,0,10"
+                    Background="#0078D7"
+                    Foreground="White"
+                    FontWeight="Bold"/>
 
-    if ([string]::IsNullOrWhiteSpace($inputModel)) {
-        [System.Windows.Forms.MessageBox]::Show("Please enter a printer model.")
+            <Label Name="StatusLabel"
+                   Content="Ready"
+                   Foreground="#aaaaaa"
+                   HorizontalAlignment="Center"/>
+
+        </StackPanel>
+    </Grid>
+</Window>
+"@
+
+# ===== LOAD UI =====
+$reader = (New-Object System.Xml.XmlNodeReader $xaml)
+$window = [Windows.Markup.XamlReader]::Load($reader)
+
+# ===== GET ELEMENTS =====
+$modelBox = $window.FindName("ModelBox")
+$startBtn = $window.FindName("StartBtn")
+$statusLabel = $window.FindName("StatusLabel")
+
+# ===== BUTTON EVENT =====
+$startBtn.Add_Click({
+    $model = $modelBox.Text.Trim().ToUpper()
+
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        $statusLabel.Content = "Enter a model first."
         return
     }
 
-    $tool = $tools | Where-Object { $_.Model -eq $inputModel }
+    $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        [System.Windows.Forms.MessageBox]::Show("Model found! Starting tool...")
-        Download-Run $tool
+        $statusLabel.Content = "Model found."
+        Download-Run $tool $statusLabel
     } else {
-        [System.Windows.Forms.MessageBox]::Show("Printer model not added.", "Not Found")
+        $statusLabel.Content = "Model not added."
     }
 })
 
-# RUN GUI
-$form.ShowDialog()
+# ===== RUN APP =====
+$window.ShowDialog()
