@@ -18,23 +18,10 @@ $seriesModels = @{
     "XP-Series" = @(
         "XP-2100","XP-3100","XP-4100","XP-5100","XP-6000"
     )
-    "WorkForce" = @(
-        "WF-2630","WF-2850","WF-2860","WF-3620","WF-3640","WF-3820",
-        "WF-4830"
-    )
-    "SureColor" = @(
-        "SC-P400","SC-P600","SC-P800","SC-T3100","SC-T5100"
-    )
-    "Expression" = @(
-        "XP-33","XP-55","XP-15000"
-    )
-    "Artisan" = @(
-        "Artisan 1430","Artisan 1500"
-    )
 }
 
 # ===================
-# AVAILABLE TOOLS (WITH DOWNLOAD LINKS)
+# AVAILABLE TOOLS
 # ===================
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
@@ -48,7 +35,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction Silent
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # ===================
-# DOWNLOAD + RUN FUNCTION
+# DOWNLOAD FUNCTION
 # ===================
 function Download-Run($tool) {
     $statusLabel.Text = "Downloading..."
@@ -56,7 +43,6 @@ function Download-Run($tool) {
     $form.Refresh()
 
     $OutFile = Join-Path $OutDir $tool.File
-
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
     } catch {
@@ -94,7 +80,7 @@ function Download-Run($tool) {
 # ===================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(580,650)
+$form.Size = New-Object System.Drawing.Size(580,500)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -112,36 +98,24 @@ $form.Controls.Add($title)
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
-$seriesCombo.Location = New-Object System.Drawing.Point(30,100)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,70)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $form.Controls.Add($seriesCombo)
 
-# SEARCH BOX (with watermark workaround)
+# SEARCH BOX (watermark workaround)
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
-$searchBox.Location = New-Object System.Drawing.Point(270,100)
+$searchBox.Location = New-Object System.Drawing.Point(270,70)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
+$searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
+$searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
-$searchBox.Add_GotFocus({
-    if ($searchBox.Text -eq "Search model...") {
-        $searchBox.Text = ""
-        $searchBox.ForeColor = [System.Drawing.Color]::White
-    }
-})
-
-$searchBox.Add_LostFocus({
-    if ([string]::IsNullOrWhiteSpace($searchBox.Text)) {
-        $searchBox.Text = "Search model..."
-        $searchBox.ForeColor = [System.Drawing.Color]::Gray
-    }
-})
-
-# LISTBOX
+# LISTBOX (shorter height)
 $modelList = New-Object System.Windows.Forms.ListBox
-$modelList.Location = New-Object System.Drawing.Point(30,150)
-$modelList.Size = New-Object System.Drawing.Size(490,320)
+$modelList.Location = New-Object System.Drawing.Point(30,120)
+$modelList.Size = New-Object System.Drawing.Size(490,220)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
@@ -150,14 +124,14 @@ $form.Controls.Add($modelList)
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
 $detailLabel.ForeColor = [System.Drawing.Color]::White
-$detailLabel.Location = New-Object System.Drawing.Point(30,490)
+$detailLabel.Location = New-Object System.Drawing.Point(30,350)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 # DOWNLOAD BUTTON
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "Download & Run"
-$buttonDownload.Location = New-Object System.Drawing.Point(30,530)
+$buttonDownload.Location = New-Object System.Drawing.Point(30,390)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
@@ -180,9 +154,15 @@ $statusStrip.Items.Add($copyright)
 $form.Controls.Add($statusStrip)
 
 # ===================
-# UI BEHAVIOR EVENTS
+# EVENTS
 # ===================
-$form.Add_Shown({ $title.Left = ($form.ClientSize.Width - $title.Width) / 2 })
+
+$form.Add_Shown({
+    $title.Left = ($form.ClientSize.Width - $title.Width) / 2
+    # Preload L-Series
+    $seriesCombo.SelectedItem = "L-Series"
+    $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
+})
 
 # Series selection
 $seriesCombo.Add_SelectedIndexChanged({
@@ -222,7 +202,7 @@ $modelList.Add_SelectedIndexChanged({
     }
 })
 
-# Download & Run button click
+# Download & Run
 $buttonDownload.Add_Click({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
@@ -231,14 +211,4 @@ $buttonDownload.Add_Click({
     }
 })
 
-# Allow Enter to trigger download
-$modelList.Add_KeyDown({
-    if ($_.KeyCode -eq "Enter") {
-        if ($buttonDownload.Enabled) { $buttonDownload.PerformClick() }
-    }
-})
-
-# ===================
-# SHOW UI
-# ===================
 $form.ShowDialog()
