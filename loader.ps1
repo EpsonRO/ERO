@@ -16,17 +16,17 @@ New-Item -ItemType Directory -Path $OutDir | Out-Null
 # ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool) {
 
-    $status.Text = "Downloading..."
+    $statusLabel.Text = "Downloading..."
     $OutFile = Join-Path $OutDir $tool.File
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
     } catch {
-        $status.Text = "Download failed."
+        $statusLabel.Text = "Download failed."
         return
     }
 
-    $status.Text = "Extracting..."
+    $statusLabel.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
@@ -39,23 +39,23 @@ function Download-Run($tool) {
            Select-Object -First 1
 
     if ($exe) {
-        $status.Text = "Launching..."
+        $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName -Wait
 
-        $status.Text = "Cleaning..."
+        $statusLabel.Text = "Cleaning..."
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
-        $status.Text = "Done!"
+        $statusLabel.Text = "Done!"
     } else {
-        $status.Text = "EXE not found."
+        $statusLabel.Text = "EXE not found."
     }
 }
 
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(420,260)
+$form.Size = New-Object System.Drawing.Size(420,280)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -97,21 +97,30 @@ $button.FlatStyle = "Flat"
 $button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
-# ===== STATUS =====
-$status = New-Object System.Windows.Forms.Label
-$status.Text = "Ready"
-$status.ForeColor = [System.Drawing.Color]::Gray
-$status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(30,190)
-$form.Controls.Add($status)
+# ===== STATUS STRIP =====
+$statusStrip = New-Object System.Windows.Forms.StatusStrip
+$statusStrip.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 
-# ===== COPYRIGHT =====
-$copyright = New-Object System.Windows.Forms.Label
+# LEFT STATUS TEXT
+$statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$statusLabel.Text = "Ready"
+$statusLabel.ForeColor = [System.Drawing.Color]::White
+
+# SPRING (push right)
+$spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
+$spacer.Spring = $true
+
+# RIGHT COPYRIGHT
+$copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
 $copyright.ForeColor = [System.Drawing.Color]::Gray
-$copyright.AutoSize = $true
-$copyright.Location = New-Object System.Drawing.Point(250,190)
-$form.Controls.Add($copyright)
+
+# ADD TO STATUS BAR
+$statusStrip.Items.Add($statusLabel) | Out-Null
+$statusStrip.Items.Add($spacer) | Out-Null
+$statusStrip.Items.Add($copyright) | Out-Null
+
+$form.Controls.Add($statusStrip)
 
 # ===== AUTOFOCUS =====
 $form.Add_Shown({
@@ -130,7 +139,7 @@ function Start-Tool {
     $model = $textbox.Text.Trim()
 
     if (-not $model) {
-        $status.Text = "Enter a model."
+        $statusLabel.Text = "Enter a model."
         return
     }
 
@@ -139,7 +148,7 @@ function Start-Tool {
     if ($tool) {
         Download-Run $tool
     } else {
-        $status.Text = "Model not added."
+        $statusLabel.Text = "Model not added."
     }
 }
 
