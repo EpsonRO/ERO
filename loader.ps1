@@ -30,23 +30,39 @@ function Download-Run($tool) {
     $statusLabel.Text = "Downloading..."
     $buttonDownload.Enabled = $false
     $form.Refresh()
+
     $OutFile = Join-Path $OutDir $tool.File
-    try { Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" } }
-    catch { $statusLabel.Text = "Download failed."; $buttonDownload.Enabled = $true; return }
+
+    # Remove existing file if exists
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+
+    try {
+        Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
+    } catch {
+        $statusLabel.Text = "Download failed."
+        $buttonDownload.Enabled = $true
+        return
+    }
 
     $statusLabel.Text = "Extracting..."; $form.Refresh()
+
     $ExtractDir = Join-Path $OutDir $tool.Model
+
+    # Remove extracted folder if exists
+    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
     $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { 
+    if ($exe) {
         $statusLabel.Text = "Launching..."
         Start-Process $exe.FullName -Wait
-        $statusLabel.Text = "Done!" 
+        $statusLabel.Text = "Done!"
+    } else {
+        $statusLabel.Text = "Executable not found."
     }
-    else { $statusLabel.Text = "Executable not found." }
 
     $buttonDownload.Enabled = $true
 }
@@ -88,10 +104,10 @@ $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
-# LISTBOX (shorter to prevent overlap)
+# LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
-$modelList.Size = New-Object System.Drawing.Size(490,200)  # shortened from 230
+$modelList.Size = New-Object System.Drawing.Size(490,200)  # shortened to avoid overlap
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
