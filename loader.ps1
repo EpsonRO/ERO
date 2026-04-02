@@ -116,7 +116,8 @@ $tools = @(
     # @{Model="WF-3800"; Url=$null; File=$null; Exe=$null},
     # @{Model="WF-3820"; Url=$null; File=$null; Exe=$null},
     # @{Model="WF-4010"; Url=$null; File=$null; Exe=$null},
-    # @{Model="WF-4830"; Url=$null; File=$null; Exe=$null}
+    # @{Model="WF-4830"; Url=$null; File=$null; Exe=$null
+    }
 )
 # =========================
 # TEMP OUTPUT DIRECTORY
