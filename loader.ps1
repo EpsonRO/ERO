@@ -5,27 +5,15 @@ Add-Type -AssemblyName System.Drawing
 # SERIES & MODELS DATA
 # ===================
 $seriesModels = @{
-    "L-Series" = @(
-        "L110","L120","L121","L125","L130","L132","L200","L210","L220",
-        "L222","L300","L301","L303","L310","L311","L312","L313","L315",
-        "L350","L351","L353","L355","L360","L361","L363","L365","L380",
-        "L382","L383","L405","L415","L6160","L6170","L6190"
-    )
-    "EcoTank" = @(
-        "ET-2650","ET-2750","ET-2850","ET-3600","ET-3700","ET-4750",
-        "ET-4800","ET-4850","ET-5800","ET-5850","ET-7700","ET-7750","ET-8500"
-    )
-    "XP-Series" = @(
-        "XP-2100","XP-3100","XP-4100","XP-5100","XP-6000"
-    )
+    "L-Series" = @("L110","L120","L121","L125","L130","L132","L200","L210","L220","L222","L300","L301","L303","L310","L311","L312","L313","L315","L350","L351","L353","L355","L360","L361","L363","L365","L380","L382","L383","L405","L415","L6160","L6170","L6190")
+    "EcoTank"  = @("ET-2650","ET-2750","ET-2850","ET-3600","ET-3700","ET-4750","ET-4800","ET-4850","ET-5800","ET-5850","ET-7700","ET-7750","ET-8500")
+    "XP-Series" = @("XP-2100","XP-3100","XP-4100","XP-5100","XP-6000")
 }
 
 # ===================
 # AVAILABLE TOOLS
 # ===================
-$tools = @(
-    @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
-)
+$tools = @(@{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"})
 
 # ===================
 # TEMP OUTPUT DIRECTORY
@@ -41,36 +29,19 @@ function Download-Run($tool) {
     $statusLabel.Text = "Downloading..."
     $buttonDownload.Enabled = $false
     $form.Refresh()
-
     $OutFile = Join-Path $OutDir $tool.File
-    try {
-        Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
-    } catch {
-        $statusLabel.Text = "Download failed."
-        $buttonDownload.Enabled = $true
-        return
-    }
+    try { Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" } }
+    catch { $statusLabel.Text = "Download failed."; $buttonDownload.Enabled = $true; return }
 
-    $statusLabel.Text = "Extracting..."
-    $form.Refresh()
-
+    $statusLabel.Text = "Extracting..."; $form.Refresh()
     $ExtractDir = Join-Path $OutDir $tool.Model
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
-
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
-    $exe = Get-ChildItem -Path $ExtractDir -Recurse |
-           Where-Object { $_.Name -ieq $tool.Exe } |
-           Select-Object -First 1
-
-    if ($exe) {
-        $statusLabel.Text = "Launching..."
-        Start-Process $exe.FullName -Wait
-        $statusLabel.Text = "Done!"
-    } else {
-        $statusLabel.Text = "Executable not found."
-    }
+    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+    if ($exe) { $statusLabel.Text = "Launching..."; Start-Process $exe.FullName -Wait; $statusLabel.Text = "Done!" }
+    else { $statusLabel.Text = "Executable not found." }
 
     $buttonDownload.Enabled = $true
 }
@@ -98,21 +69,21 @@ $form.Controls.Add($title)
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
-$seriesCombo.Location = New-Object System.Drawing.Point(30,90)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,100)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $form.Controls.Add($seriesCombo)
 
-# SEARCH BOX (watermark workaround)
+# SEARCH BOX
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
-$searchBox.Location = New-Object System.Drawing.Point(270,90)
+$searchBox.Location = New-Object System.Drawing.Point(270,100)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
-# LISTBOX (shorter height)
+# LISTBOX
 $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,140)
 $modelList.Size = New-Object System.Drawing.Size(490,200)
@@ -139,7 +110,7 @@ $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
 
-# STATUS BAR (default/light)
+# STATUS BAR (default light)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -157,23 +128,18 @@ $form.Controls.Add($statusStrip)
 # EVENTS
 # ===================
 $form.Add_Shown({
-    # Center title slightly lower
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 20
-
-    # Preload L-Series
+    $title.Top = 40  # slightly lower than top
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
+    $searchBox.Focus()  # auto-focus search box
 })
 
 # Series selection
 $seriesCombo.Add_SelectedIndexChanged({
     $selectedSeries = $seriesCombo.SelectedItem
     $modelList.Items.Clear()
-    if ($selectedSeries) {
-        $seriesModels[$selectedSeries] | ForEach-Object { $modelList.Items.Add($_) }
-        $statusLabel.Text = "Showing models for $selectedSeries"
-    }
+    if ($selectedSeries) { $seriesModels[$selectedSeries] | ForEach-Object { $modelList.Items.Add($_) } }
     $detailLabel.Text = "Model: (none selected)"
     $buttonDownload.Enabled = $false
 })
@@ -184,12 +150,7 @@ $searchBox.Add_TextChanged({
     $query = $searchBox.Text.ToUpper()
     $modelList.Items.Clear()
     $selected = $seriesCombo.SelectedItem
-    if ($selected) {
-        $seriesModels[$selected] |
-            Where-Object { $_.ToUpper() -like "*$query*" } |
-            ForEach-Object { $modelList.Items.Add($_) }
-        $statusLabel.Text = "Filter: '$query'"
-    }
+    if ($selected) { $seriesModels[$selected] | Where-Object { $_.ToUpper() -like "*$query*" } | ForEach-Object { $modelList.Items.Add($_) } }
 })
 
 # Listbox selection -> show detail
@@ -207,10 +168,7 @@ $modelList.Add_SelectedIndexChanged({
 # Download & Run
 $buttonDownload.Add_Click({
     $selModel = $modelList.SelectedItem
-    if ($selModel) {
-        $tool = $tools | Where-Object { $_.Model -eq $selModel }
-        if ($tool) { Download-Run $tool }
-    }
+    if ($selModel) { $tool = $tools | Where-Object { $_.Model -eq $selModel }; if ($tool) { Download-Run $tool } }
 })
 
 $form.ShowDialog()
