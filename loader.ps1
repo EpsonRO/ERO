@@ -1,6 +1,16 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# 🔥 FORCE FOREGROUND (WINAPI)
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+"@
+
 # ===== ALL L-SERIES MODELS =====
 $models = @(
 "L110","L120","L121","L125","L130","L132","L200","L210","L220","L222",
@@ -13,7 +23,7 @@ $models = @(
 "L1118","L3110","L3115","L3116","L3150","L3151","L3156","L1300","L1800"
 )
 
-# ===== AVAILABLE TOOLS (ONLY WITH LINKS) =====
+# ===== AVAILABLE TOOLS =====
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
@@ -127,10 +137,23 @@ $statusStrip.Items.Add($copyright) | Out-Null
 
 $form.Controls.Add($statusStrip)
 
-# ===== CENTER TITLE PERFECTLY =====
+# ===== CENTER + FORCE FOCUS =====
 $form.Add_Shown({
+
+    # Center title
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
     $title.Top = ($textbox.Top / 2) - ($title.Height / 2)
+
+    # 🔥 FORCE WINDOW TO FRONT
+    $form.TopMost = $true
+    $form.Activate()
+    $form.Focus()
+    [Win32]::SetForegroundWindow($form.Handle)
+
+    Start-Sleep -Milliseconds 200
+    $form.TopMost = $false
+
+    # Focus textbox
     $textbox.Focus()
 })
 
