@@ -16,17 +16,17 @@ New-Item -ItemType Directory -Path $OutDir | Out-Null
 # ===== DOWNLOAD FUNCTION =====
 function Download-Run($tool) {
 
-    $statusLabel.Text = "Downloading..."
+    $status.Text = "Downloading..."
     $OutFile = Join-Path $OutDir $tool.File
 
     try {
         Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
     } catch {
-        $statusLabel.Text = "Download failed."
+        $status.Text = "Download failed."
         return
     }
 
-    $statusLabel.Text = "Extracting..."
+    $status.Text = "Extracting..."
 
     $ExtractDir = Join-Path $OutDir $tool.Model
     New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
@@ -39,16 +39,16 @@ function Download-Run($tool) {
            Select-Object -First 1
 
     if ($exe) {
-        $statusLabel.Text = "Launching..."
+        $status.Text = "Launching..."
         Start-Process $exe.FullName -Wait
 
-        $statusLabel.Text = "Cleaning..."
+        $status.Text = "Cleaning..."
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
-        $statusLabel.Text = "Done!"
+        $status.Text = "Done!"
     } else {
-        $statusLabel.Text = "EXE not found."
+        $status.Text = "EXE not found."
     }
 }
 
@@ -67,7 +67,7 @@ $title.Text = "EPSON RESETTER ONLINE"
 $title.ForeColor = [System.Drawing.Color]::White
 $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
-$title.Location = New-Object System.Drawing.Point(70,20)
+$title.Location = New-Object System.Drawing.Point(55,20)
 $form.Controls.Add($title)
 
 # ===== LABEL =====
@@ -97,20 +97,20 @@ $button.FlatStyle = "Flat"
 $button.FlatAppearance.BorderSize = 0
 $form.Controls.Add($button)
 
-# ===== STATUS TEXT =====
-$statusLabel = New-Object System.Windows.Forms.Label
-$statusLabel.Text = "Ready"
-$statusLabel.ForeColor = [System.Drawing.Color]::Gray
-$statusLabel.AutoSize = $true
-$statusLabel.Location = New-Object System.Drawing.Point(30,190)
-$form.Controls.Add($statusLabel)
+# ===== STATUS =====
+$status = New-Object System.Windows.Forms.Label
+$status.Text = "Ready"
+$status.ForeColor = [System.Drawing.Color]::Gray
+$status.AutoSize = $true
+$status.Location = New-Object System.Drawing.Point(30,190)
+$form.Controls.Add($status)
 
 # ===== COPYRIGHT =====
 $copyright = New-Object System.Windows.Forms.Label
-$copyright.Text = "© 2026, KLBSoft"
+$copyright.Text = "© 2026 KLBSoft"
 $copyright.ForeColor = [System.Drawing.Color]::Gray
 $copyright.AutoSize = $true
-$copyright.Location = New-Object System.Drawing.Point(270,190)
+$copyright.Location = New-Object System.Drawing.Point(250,190)
 $form.Controls.Add($copyright)
 
 # ===== AUTOFOCUS =====
@@ -130,7 +130,7 @@ function Start-Tool {
     $model = $textbox.Text.Trim()
 
     if (-not $model) {
-        $statusLabel.Text = "Enter a model."
+        $status.Text = "Enter a model."
         return
     }
 
@@ -139,11 +139,11 @@ function Start-Tool {
     if ($tool) {
         Download-Run $tool
     } else {
-        $statusLabel.Text = "Model not added."
+        $status.Text = "Model not added."
     }
 }
 
-# BUTTON CLICK
+# BUTTON
 $button.Add_Click({ Start-Tool })
 
 # ENTER KEY
