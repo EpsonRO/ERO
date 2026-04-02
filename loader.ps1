@@ -5,7 +5,6 @@ if ([Threading.Thread]::CurrentThread.ApartmentState -ne "STA") {
 }
 
 Add-Type -AssemblyName PresentationFramework
-Add-Type -AssemblyName System.Net
 
 # ===== TOOL DATABASE =====
 $tools = @(
@@ -18,37 +17,18 @@ if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
 
-# ===== DOWNLOAD WITH PROGRESS =====
-function Download-File($url, $outFile, $progressBar, $statusLabel) {
+# ===== DOWNLOAD FUNCTION =====
+function Download-Run($tool, $statusLabel) {
 
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-
-    $done = $false
-
-    $wc.DownloadProgressChanged += {
-        $progressBar.Value = $_.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
-    }
-
-    $wc.DownloadFileCompleted += {
-        $done = $true
-    }
-
-    $wc.DownloadFileAsync($url, $outFile)
-
-    while (-not $done) {
-        Start-Sleep -Milliseconds 200
-        [System.Windows.Forms.Application]::DoEvents()
-    }
-}
-
-# ===== MAIN FUNCTION =====
-function Download-Run($tool, $progressBar, $statusLabel) {
-
+    $statusLabel.Text = "Downloading..."
     $OutFile = Join-Path $OutDir $tool.File
 
-    Download-File $tool.Url $OutFile $progressBar $statusLabel
+    try {
+        Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -Headers @{ "User-Agent"="Mozilla/5.0" }
+    } catch {
+        $statusLabel.Text = "Download failed."
+        return
+    }
 
     $statusLabel.Text = "Extracting..."
 
@@ -75,7 +55,6 @@ function Download-Run($tool, $progressBar, $statusLabel) {
         Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item $OutFile -Force -ErrorAction SilentlyContinue
 
-        $progressBar.Value = 0
         $statusLabel.Text = "Done!"
     } else {
         $statusLabel.Text = "EXE not found."
@@ -86,7 +65,7 @@ function Download-Run($tool, $progressBar, $statusLabel) {
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         Title="Epson Resetter"
-        Height="360" Width="420"
+        Height="320" Width="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#1b1b1b">
@@ -121,14 +100,10 @@ function Download-Run($tool, $progressBar, $statusLabel) {
                         FontWeight="Bold"
                         BorderThickness="0"/>
 
-                <ProgressBar Name="ProgressBar"
-                             Height="20"
-                             Margin="0,15,0,5"
-                             Minimum="0" Maximum="100"/>
-
                 <TextBlock Name="StatusLabel"
                            Text="Ready"
                            Foreground="#aaaaaa"
+                           Margin="15,15,0,0"
                            HorizontalAlignment="Center"/>
 
             </StackPanel>
@@ -144,9 +119,8 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 $modelBox = $window.FindName("ModelBox")
 $startBtn = $window.FindName("StartBtn")
 $statusLabel = $window.FindName("StatusLabel")
-$progressBar = $window.FindName("ProgressBar")
 
-# AUTOFOCUS (REAL FIX)
+# AUTOFOCUS (WORKING FIX)
 $window.Dispatcher.InvokeAsync({
     $modelBox.Focus()
     [System.Windows.Input.Keyboard]::Focus($modelBox)
@@ -171,7 +145,7 @@ function Start-Tool {
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        Download-Run $tool $progressBar $statusLabel
+        Download-Run $tool $statusLabel
     } else {
         $statusLabel.Text = "Model not added."
     }
