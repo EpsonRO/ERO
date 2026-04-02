@@ -18,24 +18,17 @@ $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
 )
 
-# ===== TEMP =====
-$OutDir = Join-Path $env:TEMP "ERO-Tools"
-if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
-New-Item -ItemType Directory -Path $OutDir | Out-Null
-
 # ===== FORM =====
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(420,300)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
-$form.FormBorderStyle = "FixedSingle"
-$form.MaximizeBox = $false
 
 # ===== TITLE =====
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = [System.Drawing.Color]::White
+$title.ForeColor = "White"
 $title.Font = New-Object System.Drawing.Font("Segoe UI",14,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
@@ -43,31 +36,25 @@ $form.Controls.Add($title)
 # ===== LABEL =====
 $label = New-Object System.Windows.Forms.Label
 $label.Text = "Printer Model"
-$label.ForeColor = [System.Drawing.Color]::Silver
-$label.Location = New-Object System.Drawing.Point(30,90)
+$label.ForeColor = "Silver"
+$label.Location = New-Object System.Drawing.Point(30,100)
 $form.Controls.Add($label)
 
 # ===== TEXTBOX =====
 $textbox = New-Object System.Windows.Forms.TextBox
-$textbox.Size = New-Object System.Drawing.Size(340,28)
-$textbox.Location = New-Object System.Drawing.Point(30,115)
-$textbox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$textbox.ForeColor = [System.Drawing.Color]::White
+$textbox.Size = New-Object System.Drawing.Size(340,25)
+$textbox.Location = New-Object System.Drawing.Point(30,125)
 $form.Controls.Add($textbox)
 
 # ===== BUTTON =====
 $button = New-Object System.Windows.Forms.Button
 $button.Text = "START"
-$button.Size = New-Object System.Drawing.Size(340,38)
-$button.Location = New-Object System.Drawing.Point(30,155)
-$button.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
-$button.ForeColor = [System.Drawing.Color]::White
-$button.FlatStyle = "Flat"
+$button.Size = New-Object System.Drawing.Size(340,35)
+$button.Location = New-Object System.Drawing.Point(30,160)
 $form.Controls.Add($button)
 
 # ===== STATUS BAR =====
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
-$statusStrip.Dock = "Bottom"
 
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
@@ -78,56 +65,20 @@ $spacer.Spring = $true
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
 
-$statusStrip.Items.Add($statusLabel) | Out-Null
-$statusStrip.Items.Add($spacer) | Out-Null
-$statusStrip.Items.Add($copyright) | Out-Null
+$statusStrip.Items.Add($statusLabel)
+$statusStrip.Items.Add($spacer)
+$statusStrip.Items.Add($copyright)
 
 $form.Controls.Add($statusStrip)
 
-# ===== CENTER TITLE (SAFE) =====
+# ===== CENTER TITLE =====
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
-    $title.Top = 45
+    $title.Top = 50
     $textbox.Focus()
 })
 
-# ===== DOWNLOAD FUNCTION =====
-function Download-Run($tool) {
-
-    $statusLabel.Text = "Downloading..."
-    $form.Refresh()
-
-    $OutFile = Join-Path $OutDir $tool.File
-
-    try {
-        Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -UseBasicParsing
-    } catch {
-        $statusLabel.Text = "Download failed."
-        return
-    }
-
-    $statusLabel.Text = "Extracting..."
-    $form.Refresh()
-
-    $ExtractDir = Join-Path $OutDir $tool.Model
-    New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
-
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-
-    $exe = Get-ChildItem $ExtractDir -Recurse | Where-Object { $_.Name -eq $tool.Exe } | Select-Object -First 1
-
-    if ($exe) {
-        $statusLabel.Text = "Launching..."
-        Start-Process $exe.FullName -Wait
-
-        $statusLabel.Text = "Done!"
-    } else {
-        $statusLabel.Text = "EXE not found."
-    }
-}
-
-# ===== MAIN LOGIC =====
+# ===== BUTTON CLICK =====
 $button.Add_Click({
 
     $model = $textbox.Text.Trim().ToUpper()
@@ -145,12 +96,13 @@ $button.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $model }
 
     if ($tool) {
-        Download-Run $tool
+        $statusLabel.Text = "Tool available!"
     } else {
         $statusLabel.Text = "PRINTER MODEL NOT FOUND!"
     }
 })
 
+# ===== ENTER KEY =====
 $textbox.Add_KeyDown({
     if ($_.KeyCode -eq "Enter") {
         $button.PerformClick()
