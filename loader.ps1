@@ -79,7 +79,7 @@ $tools = @(
     # @{Model="L3110"; Url=$null; File=$null; Exe=$null},
     # @{Model="L3115"; Url=$null; File=$null; Exe=$null},
     # @{Model="L3116"; Url=$null; File=$null; Exe=$null},
-    @{Model="L3150"; Url= "https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L3150"; Url= "https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"},
     # @{Model="L3151"; Url=$null; File=$null; Exe=$null},
     # @{Model="L3156"; Url=$null; File=$null; Exe=$null},
     # @{Model="L1300"; Url=$null; File=$null; Exe=$null},
