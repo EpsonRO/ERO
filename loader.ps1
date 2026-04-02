@@ -88,10 +88,10 @@ $form.Controls.Add($searchBox)
 $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBox.Text=""; $searchBox.ForeColor=[System.Drawing.Color]::White } })
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
-# LISTBOX
+# LISTBOX (shorter to prevent overlap)
 $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
-$modelList.Size = New-Object System.Drawing.Size(490,230)
+$modelList.Size = New-Object System.Drawing.Size(490,200)  # shortened from 230
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
@@ -100,14 +100,14 @@ $form.Controls.Add($modelList)
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
 $detailLabel.ForeColor = [System.Drawing.Color]::White
-$detailLabel.Location = New-Object System.Drawing.Point(30,360)
+$detailLabel.Location = New-Object System.Drawing.Point(30,330)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 # DOWNLOAD BUTTON
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "Download & Run"
-$buttonDownload.Location = New-Object System.Drawing.Point(30,400)
+$buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
