@@ -96,14 +96,14 @@ $form.Controls.Add($modelList)
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
 $detailLabel.ForeColor = [System.Drawing.Color]::White
-$detailLabel.Location = New-Object System.Drawing.Point(30,350)
+$detailLabel.Location = New-Object System.Drawing.Point(30,330)  # moved up from 350 to 330
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 # DOWNLOAD BUTTON
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "Download & Run"
-$buttonDownload.Location = New-Object System.Drawing.Point(30,370)  # leave space below
+$buttonDownload.Location = New-Object System.Drawing.Point(30,370)  # still 370
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
