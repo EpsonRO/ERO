@@ -1,4 +1,3 @@
-# ===== LOAD GUI LIBRARIES =====
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
@@ -97,8 +96,11 @@ $status.AutoSize = $true
 $status.Location = New-Object System.Drawing.Point(150,180)
 $form.Controls.Add($status)
 
-# ===== AUTOFOCUS (WORKS 100%) =====
+# ===== AUTOFOCUS (REAL FIX) =====
 $form.Add_Shown({
+    $form.Activate()
+    Start-Sleep -Milliseconds 100
+    $form.ActiveControl = $textbox
     $textbox.Focus()
 })
 
@@ -138,4 +140,4 @@ $textbox.Add_KeyDown({
 })
 
 # RUN APP
-$form.ShowDialog()
+[void]$form.ShowDialog()
