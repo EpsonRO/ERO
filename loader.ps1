@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION (PS7+ compatible)
+# DOWNLOAD FUNCTION FOR PS7+
 # =========================
 function Download-Tool {
     param($tool)
@@ -167,7 +167,6 @@ function Download-Tool {
         $buttonDownload.Enabled = $true
     } | Out-Null
 
-    # Start download
     $wc.DownloadFileAsync([Uri]$tool.Url, $OutFile)
 }
 
