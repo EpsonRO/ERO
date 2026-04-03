@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION FOR PS7+
+# DOWNLOAD FUNCTION (PowerShell 7+)
 # =========================
 function Download-Tool {
     param($tool)
@@ -139,10 +139,10 @@ function Download-Tool {
 
     $wc = New-Object System.Net.WebClient
 
-    # Register events
+    # Use Register-ObjectEvent instead of .Add()
     Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action {
         $progressBar.Value = $EventArgs.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($EventArgs.ProgressPercentage)%"
+        $statusLabel.Text = "Downloading $($EventArgs.ProgressPercentage)%"
     } | Out-Null
 
     Register-ObjectEvent -InputObject $wc -EventName DownloadFileCompleted -Action {
@@ -153,12 +153,8 @@ function Download-Tool {
             try {
                 [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
                 $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-                if ($exe) { 
-                    Start-Process $exe.FullName
-                    $statusLabel.Text = "Done!"
-                } else {
-                    $statusLabel.Text = "Executable not found."
-                }
+                if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
+                else { $statusLabel.Text = "Executable not found." }
             } catch {
                 $statusLabel.Text = "Extraction failed: $($_.Exception.Message)"
             }
@@ -167,6 +163,7 @@ function Download-Tool {
         $buttonDownload.Enabled = $true
     } | Out-Null
 
+    # Start async download
     $wc.DownloadFileAsync([Uri]$tool.Url, $OutFile)
 }
 
