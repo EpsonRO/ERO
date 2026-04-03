@@ -20,7 +20,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# GUI
+# ORIGINAL GUI
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
@@ -74,7 +74,7 @@ $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # Blue
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -95,7 +95,7 @@ $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
 # =========================
-# Events
+# GUI EVENTS
 # =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width)/2
@@ -123,11 +123,10 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# BACKGROUND WORKER DOWNLOAD
+# DOWNLOAD WITH BACKGROUNDWORKER
 # =========================
 $bgWorker = New-Object System.ComponentModel.BackgroundWorker
 $bgWorker.WorkerReportsProgress = $true
-$bgWorker.WorkerSupportsCancellation = $true
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
@@ -144,10 +143,7 @@ $buttonDownload.Add_Click({
 
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
-        $wc.DownloadProgressChanged.Add({
-            param($s,$ev)
-            $sender.ReportProgress($ev.ProgressPercentage)
-        })
+        $wc.DownloadProgressChanged.Add({ param($s,$ev) $sender.ReportProgress($ev.ProgressPercentage) })
         $wc.DownloadFile($tool.Url, $OutFile)
 
         $ExtractDir = Join-Path $OutDir $tool.Model
@@ -159,16 +155,8 @@ $buttonDownload.Add_Click({
         if ($exe) { Start-Process $exe.FullName }
     })
 
-    $bgWorker.ProgressChanged.Add({
-        param($s,$ev)
-        $progressBar.Value = $ev.ProgressPercentage
-    })
-
-    $bgWorker.RunWorkerCompleted.Add({
-        param($s,$ev)
-        $statusLabel.Text = "Done!"
-        $buttonDownload.Enabled = $true
-    })
+    $bgWorker.ProgressChanged.Add({ param($s,$ev) $progressBar.Value = $ev.ProgressPercentage })
+    $bgWorker.RunWorkerCompleted.Add({ param($s,$ev) $statusLabel.Text="Done!"; $buttonDownload.Enabled=$true })
 
     $bgWorker.RunWorkerAsync()
 })
