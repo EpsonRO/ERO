@@ -66,8 +66,8 @@ function Run-Resetter {
     $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "AdjProg.exe" | Select-Object -First 1
     if ($exe) {
         Write-Host "Launching AdjProg.exe..." -ForegroundColor Cyan
-        Start-Process $exe.FullName
-        Write-Host "Done!" -ForegroundColor Green
+        Start-Process $exe.FullName -Wait
+        Write-Host "`nAdjProg.exe closed. Returning to menu..." -ForegroundColor Green
     } else {
         Write-Host "AdjProg.exe not found in extracted files." -ForegroundColor Red
     }
@@ -91,7 +91,6 @@ while ($true) {
             } else {
                 Run-Resetter $model
             }
-            Read-Host "`nPress Enter to return to menu..."
         }
         "2" {
             Write-Host "`nExiting... Goodbye!" -ForegroundColor Cyan
@@ -99,7 +98,6 @@ while ($true) {
         }
         default {
             Write-Host "`nInvalid choice!" -ForegroundColor Yellow
-            Read-Host "`nPress Enter to return to menu..."
         }
     }
 }
