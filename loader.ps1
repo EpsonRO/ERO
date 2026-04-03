@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # =========================
-# DATA
+# SERIES & MODELS DATA
 # =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
@@ -11,7 +11,7 @@ $seriesModels = @{
 
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L3150/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L3150"; Url="https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
@@ -19,7 +19,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# GUI
+# GUI SETUP
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
@@ -73,7 +73,7 @@ $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # Blue
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# ASYNC DOWNLOAD FUNCTION (WORKS)
+# DOWNLOAD FUNCTION FOR PS7+
 # =========================
 function Download-Tool {
     param($tool)
@@ -137,31 +137,40 @@ function Download-Tool {
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent","Mozilla/5.0")
+    # Start async download with progress
+    Start-Job -Name "DownloadTool" -ScriptBlock {
+        param($tool,$OutFile)
 
-    $wc.DownloadProgressChanged.Add({
-        param($s,$e)
-        $progressBar.Value = $e.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
-        $form.Refresh()
-    })
+        $wc = [System.Net.Http.HttpClient]::new()
+        $response = $wc.GetAsync($tool.Url,[System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        $total = $response.Content.Headers.ContentLength
+        $stream = $response.Content.ReadAsStreamAsync().Result
 
-    $wc.DownloadFileCompleted.Add({
-        param($s,$e)
-        try {
-            [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-            $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-            if ($exe) { Start-Process $exe.FullName }
-            $statusLabel.Text = "Done!"
-        } catch {
-            $statusLabel.Text = "Error extracting or launching."
+        $fileStream = [System.IO.File]::OpenWrite($OutFile)
+        $buffer = New-Object byte[] 8192
+        $read = 0
+        while (($count = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
+            $fileStream.Write($buffer,0,$count)
+            $read += $count
+            $percent = [int](($read / $total) * 100)
+            $percent = [Math]::Min($percent,100)
+            # Send progress to main thread
+            Write-Output $percent
         }
-        $progressBar.Value = 100
-        $buttonDownload.Enabled = $true
-    })
+        $fileStream.Close()
+    } | ForEach-Object {
+        while (-not $_.HasMoreData) { Start-Sleep 0.1 }
+    } | Receive-Job -Keep
 
-    $wc.DownloadFileAsync([uri]$tool.Url, $OutFile)
+    # Extract ZIP
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+
+    # Launch executable
+    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
+    else { $statusLabel.Text = "Executable not found." }
+    $progressBar.Value = 100
+    $buttonDownload.Enabled = $true
 }
 
 $buttonDownload.Add_Click({
@@ -169,7 +178,4 @@ $buttonDownload.Add_Click({
     if ($tool) { Download-Tool $tool }
 })
 
-# =========================
-# SHOW FORM
-# =========================
 $form.ShowDialog()
