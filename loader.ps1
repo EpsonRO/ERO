@@ -4,10 +4,9 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-Add-Type -AssemblyName System.ComponentModel
 
 # =========================
-# SERIES & MODELS DATA
+# DATA
 # =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
@@ -138,58 +137,48 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD & LAUNCH FUNCTION USING BACKGROUNDWORKER
+# DOWNLOAD & LAUNCH FUNCTION USING JOB
 # =========================
-$worker = New-Object System.ComponentModel.BackgroundWorker
-$worker.WorkerReportsProgress = $true
-
-$worker.DoWork += {
-    param($sender,$e)
-    $tool = $e.Argument
-    $OutFile = Join-Path $OutDir $tool.File
-    $ExtractDir = Join-Path $OutDir $tool.Model
-
-    # Remove old files
-    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent","Mozilla/5.0")
-    $wc.DownloadProgressChanged += {
-        param($s,$ev)
-        $sender.ReportProgress($ev.ProgressPercentage)
-    }
-
-    $wc.DownloadFile($tool.Url,$OutFile)
-
-    # Extract ZIP
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-    $e.Result = $tool
-}
-
-$worker.ProgressChanged += {
-    param($s,$e)
-    $progressBar.Value = $e.ProgressPercentage
-    $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
-}
-
-$worker.RunWorkerCompleted += {
-    param($s,$e)
-    $tool = $e.Result
-    $statusLabel.Text = "Download complete!"
-    $exe = Get-ChildItem -Path (Join-Path $OutDir $tool.Model) -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
-    else { $statusLabel.Text="Executable not found." }
-    $buttonDownload.Enabled = $true
-}
-
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
     if ($tool) {
         $buttonDownload.Enabled = $false
-        $progressBar.Value = 0
-        $statusLabel.Text = "Starting download..."
-        $worker.RunWorkerAsync($tool)
+        $progressBar.Style = 'Marquee'
+        $progressBar.MarqueeAnimationSpeed = 30
+        $statusLabel.Text = "Downloading..."
+
+        # Remove old files
+        if (Test-Path (Join-Path $OutDir $tool.File)) { Remove-Item (Join-Path $OutDir $tool.File) -Force }
+        if (Test-Path (Join-Path $OutDir $tool.Model)) { Remove-Item (Join-Path $OutDir $tool.Model) -Recurse -Force }
+
+        # Start download job
+        $job = Start-Job -ScriptBlock {
+            param($Url,$OutFile)
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent","Mozilla/5.0")
+            $wc.DownloadFile($Url, $OutFile)
+        } -ArgumentList $tool.Url,(Join-Path $OutDir $tool.File)
+
+        # Wait & update GUI
+        while ($job.State -eq 'Running') {
+            Start-Sleep -Milliseconds 200
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+
+        Receive-Job $job | Out-Null
+        Remove-Job $job
+
+        # Extract
+        try {
+            $ExtractDir = Join-Path $OutDir $tool.Model
+            [System.IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $OutDir $tool.File), $ExtractDir)
+            $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+            if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
+            else { $statusLabel.Text="Executable not found." }
+        } catch { $statusLabel.Text="Error extracting ZIP." }
+
+        $progressBar.Style = 'Blocks'
+        $buttonDownload.Enabled = $true
     }
 })
 
