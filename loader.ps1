@@ -2,25 +2,20 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# =========================
-# SERIES & MODELS DATA
-# =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
 }
 
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L3150"; Url="https://github.com/EpsonRO/L3150/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
-# =========================
-# GUI SETUP
-# =========================
+# GUI
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(580,520)
@@ -73,7 +68,7 @@ $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # Blue
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -93,9 +88,7 @@ $statusLabel.ForeColor = [System.Drawing.Color]::Black
 $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
-# =========================
 # GUI EVENTS
-# =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width)/2
     $title.Top = 20
@@ -117,13 +110,11 @@ $modelList.Add_SelectedIndexChanged({
         $detailLabel.Text = "Model: $selModel"
         $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
         $buttonDownload.Enabled = $foundTool -ne $null
-        if ($foundTool) { $statusLabel.Text = "RESETTER AVAILABLE!" } else { $statusLabel.Text = "RESETTER NOT AVAILABLE YET!" }
+        $statusLabel.Text = if ($foundTool) {"RESETTER AVAILABLE!"} else {"RESETTER NOT AVAILABLE YET!"}
     }
 })
 
-# =========================
-# DOWNLOAD FUNCTION
-# =========================
+# DOWNLOAD FUNCTION WITHOUT EVENTS
 function Download-Run {
     param($tool)
 
@@ -131,41 +122,35 @@ function Download-Run {
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    # Run in background
-    $job = Start-Job -ArgumentList $tool, $progressBar, $statusLabel -ScriptBlock {
+    Start-Job -ArgumentList $tool, $progressBar, $statusLabel -ScriptBlock {
         param($tool, $progressBar, $statusLabel)
-
         $OutDir = Join-Path $env:TEMP "ERO-Tools"
         $OutFile = Join-Path $OutDir $tool.File
+        $ExtractDir = Join-Path $OutDir $tool.Model
 
         if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-        $ExtractDir = Join-Path $OutDir $tool.Model
         if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
-
         $wc.DownloadFile($tool.Url, $OutFile)
 
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) {
-            Start-Process $exe.FullName
-            $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
-            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
-        } else {
-            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." })
-        }
-    }
+        if ($exe) { Start-Process $exe.FullName }
+    } | Out-Null
 
-    # Poll progress every 0.2s
+    # simple polling for completion
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 200
     $timer.Add_Tick({
-        if ($job.State -eq 'Completed' -or $job.State -eq 'Failed') {
+        $progressBar.Value = ($progressBar.Value + 5) % 100
+        if ((Get-Job | Where-Object {$_.State -eq "Completed"})) {
             $timer.Stop()
-            Remove-Job $job -Force
+            Remove-Job -State Completed -Force
+            $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
             $buttonDownload.Enabled = $true
         }
     })
