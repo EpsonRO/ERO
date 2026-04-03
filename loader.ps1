@@ -1,5 +1,6 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.ComponentModel
 
 # =========================
@@ -88,7 +89,7 @@ $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # bright blue
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -111,12 +112,11 @@ $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
 # =========================
-# EVENTS
+# FORM EVENTS
 # =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width) / 2
     $title.Top = 20
-    # Preload L-Series
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
 })
@@ -149,59 +149,47 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# BACKGROUNDWORKER DOWNLOAD
+# BACKGROUND DOWNLOAD FUNCTION
 # =========================
-$bgWorker = New-Object System.ComponentModel.BackgroundWorker
-$bgWorker.WorkerReportsProgress = $true
+function Download-Tool($tool) {
+    $progressBar.Value = 0
+    $statusLabel.Text = "Starting..."
+    $buttonDownload.Enabled = $false
 
-$toolToDownload = $null
+    $job = Start-Job -ArgumentList $tool -ScriptBlock {
+        param($t)
+        $OutFile = Join-Path $env:TEMP "ERO-Tools" $t.File
+        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 
-$bgWorker.DoWork += {
-    param($sender, $e)
-    $tool = $e.Argument
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent","Mozilla/5.0")
+        $wc.DownloadFile($t.Url, $OutFile)
 
-    $OutFile = Join-Path $OutDir $tool.File
-    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+        $ExtractDir = Join-Path $env:TEMP "ERO-Tools" $t.Model
+        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent","Mozilla/5.0")
-    $wc.DownloadProgressChanged += { param($s,$p) $bgWorker.ReportProgress($p.ProgressPercentage,"Downloading... $($p.ProgressPercentage)%") }
-    $wc.DownloadFile($tool.Url, $OutFile)
+        $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $t.Exe } | Select-Object -First 1
+        if ($exe) { Start-Process $exe.FullName }
+    }
 
-    # Extract
-    $ExtractDir = Join-Path $OutDir $tool.Model
-    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-    New-Item -ItemType Directory -Path $ExtractDir | Out-Null
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-
-    # Run EXE
-    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { Start-Process $exe.FullName }
+    Register-ObjectEvent -InputObject $job -EventName "StateChanged" -Action {
+        if ($job.State -eq "Completed") {
+            $statusLabel.Text = "Done!"
+            $buttonDownload.Enabled = $true
+            Unregister-Event -SourceIdentifier $job.InstanceId
+            Remove-Job $job
+        }
+    } | Out-Null
 }
 
-$bgWorker.ProgressChanged += {
-    param($s,$e)
-    $progressBar.Value = $e.ProgressPercentage
-    $statusLabel.Text = $e.UserState
-}
-
-$bgWorker.RunWorkerCompleted += {
-    param($s,$e)
-    $statusLabel.Text = "Done!"
-    $buttonDownload.Enabled = $true
-}
-
+# Button click
 $buttonDownload.Add_Click({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
-        $toolToDownload = $tools | Where-Object { $_.Model -eq $selModel }
-        if ($toolToDownload) {
-            $buttonDownload.Enabled = $false
-            $progressBar.Value = 0
-            $statusLabel.Text = "Starting..."
-            $bgWorker.RunWorkerAsync($toolToDownload)
-        }
+        $tool = $tools | Where-Object { $_.Model -eq $selModel }
+        if ($tool) { Download-Tool $tool }
     }
 })
 
