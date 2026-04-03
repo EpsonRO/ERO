@@ -12,7 +12,7 @@ $seriesModels = @{
 }
 
 # =========================
-# TOOLS
+# AVAILABLE TOOLS
 # =========================
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
@@ -20,63 +20,126 @@ $tools = @(
 )
 
 # =========================
-# TEMP DIR
+# TEMP DIRECTORY
 # =========================
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# FORM
+# DOWNLOAD FUNCTION (ASYNC - NO FREEZE)
+# =========================
+function Download-Run($tool)
+{
+    $form.UseWaitCursor = $true
+    $buttonDownload.Enabled = $false
+    $progressBar.Value = 0
+    $statusLabel.Text = "Downloading..."
+
+    $OutFile = Join-Path $OutDir $tool.File
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+
+    $wc = New-Object System.Net.WebClient
+
+    # Progress update
+    $wc.DownloadProgressChanged += {
+        $progressBar.Value = $_.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
+    }
+
+    # Download complete
+    $wc.DownloadFileCompleted += {
+
+        if ($_.Cancelled -or $_.Error) {
+            $statusLabel.Text = "Download failed."
+            $buttonDownload.Enabled = $true
+            $form.UseWaitCursor = $false
+            return
+        }
+
+        # Extract
+        $statusLabel.Text = "Extracting..."
+        $progressBar.Value = 0
+
+        $ExtractDir = Join-Path $OutDir $tool.Model
+        if (Test-Path $ExtractDir) {
+            Remove-Item $ExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+
+        # Find EXE
+        $exe = Get-ChildItem -Path $ExtractDir -Recurse |
+               Where-Object { $_.Name -ieq $tool.Exe } |
+               Select-Object -First 1
+
+        if ($exe) {
+            $statusLabel.Text = "Launching..."
+            Start-Process $exe.FullName
+            $statusLabel.Text = "Done!"
+        } else {
+            $statusLabel.Text = "Executable not found."
+        }
+
+        $buttonDownload.Enabled = $true
+        $form.UseWaitCursor = $false
+    }
+
+    # Start async download
+    $wc.DownloadFileAsync([Uri]$tool.Url, $OutFile)
+}
+
+# =========================
+# FORM BUILD
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(580,560)
+$form.Size = New-Object System.Drawing.Size(580,520)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
-# reduce flicker
-$form.GetType().GetProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance).SetValue($form,$true,$null)
-
 # TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = "White"
+$title.ForeColor = [System.Drawing.Color]::White
 $title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
 
-# SERIES
+# SERIES COMBOBOX
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
 $seriesCombo.Location = New-Object System.Drawing.Point(30,80)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $seriesCombo.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$seriesCombo.ForeColor = "White"
+$seriesCombo.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($seriesCombo)
 
-# SEARCH
+# SEARCH BOX
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
-$searchBox.ForeColor = "Gray"
+$searchBox.ForeColor = [System.Drawing.Color]::Gray
 $searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
+$searchBox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $form.Controls.Add($searchBox)
 
 $searchBox.Add_GotFocus({
     if ($searchBox.Text -eq "Search model...") {
         $searchBox.Text=""
-        $searchBox.ForeColor="White"
+        $searchBox.ForeColor=[System.Drawing.Color]::White
     }
 })
 
 $searchBox.Add_LostFocus({
     if ([string]::IsNullOrWhiteSpace($searchBox.Text)) {
         $searchBox.Text="Search model..."
-        $searchBox.ForeColor="Gray"
+        $searchBox.ForeColor=[System.Drawing.Color]::Gray
     }
 })
 
@@ -85,14 +148,15 @@ $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
 $modelList.Size = New-Object System.Drawing.Size(490,200)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$modelList.ForeColor = "White"
+$modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
 
-# DETAILS
+# DETAILS LABEL
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
-$detailLabel.ForeColor = "White"
+$detailLabel.ForeColor = [System.Drawing.Color]::White
 $detailLabel.Location = New-Object System.Drawing.Point(30,330)
+$detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 # BUTTON
@@ -101,22 +165,29 @@ $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
-$buttonDownload.ForeColor = "White"
+$buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
 
-# PROGRESS
+# PROGRESS BAR
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(30,420)
 $progressBar.Size = New-Object System.Drawing.Size(490,20)
+$progressBar.Minimum = 0
+$progressBar.Maximum = 100
 $form.Controls.Add($progressBar)
 
-# STATUS
+# STATUS BAR
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
+$statusStrip.Dock = "Bottom"
+$statusStrip.BackColor = [System.Drawing.Color]::White
+
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
+
 $spacer = New-Object System.Windows.Forms.ToolStripStatusLabel
 $spacer.Spring = $true
+
 $copyright = New-Object System.Windows.Forms.ToolStripStatusLabel
 $copyright.Text = "© 2026 KLBSoft"
 
@@ -124,105 +195,6 @@ $statusStrip.Items.Add($statusLabel)
 $statusStrip.Items.Add($spacer)
 $statusStrip.Items.Add($copyright)
 $form.Controls.Add($statusStrip)
-
-# =========================
-# DOWNLOAD (BACKGROUND + NO FREEZE)
-# =========================
-function Download-Run($tool)
-{
-    $buttonDownload.Enabled = $false
-    $progressBar.Value = 0
-    $statusLabel.Text = "Starting..."
-
-    $job = Start-Job -ArgumentList $tool,$OutDir -ScriptBlock {
-        param($tool,$OutDir)
-
-        $OutFile = Join-Path $OutDir $tool.File
-
-        $request = [System.Net.HttpWebRequest]::Create($tool.Url)
-        $response = $request.GetResponse()
-        $totalLength = $response.ContentLength
-
-        $stream = $response.GetResponseStream()
-        $fileStream = [System.IO.File]::Create($OutFile)
-
-        $buffer = New-Object byte[] 8192
-        $totalRead = 0
-
-        while (($read = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
-            $fileStream.Write($buffer,0,$read)
-            $totalRead += $read
-
-            if ($totalLength -gt 0) {
-                [PSCustomObject]@{
-                    Type="Progress"
-                    Percent=[int](($totalRead/$totalLength)*100)
-                }
-            }
-        }
-
-        $fileStream.Close()
-        $stream.Close()
-        $response.Close()
-
-        $ExtractDir = Join-Path $OutDir $tool.Model
-        New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
-
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-
-        $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-
-        if ($exe) {
-            [PSCustomObject]@{Type="Done"; Path=$exe.FullName}
-        } else {
-            [PSCustomObject]@{Type="Error"}
-        }
-    }
-
-    $timer = New-Object System.Windows.Forms.Timer
-    $timer.Interval = 200
-
-    $timer.Add_Tick({
-        try {
-            $data = Receive-Job $job -Keep -ErrorAction SilentlyContinue
-
-            foreach ($d in $data) {
-                if ($d.Type -eq "Progress") {
-                    if ($d.Percent -le 100) {
-                        $progressBar.Value = $d.Percent
-                        $statusLabel.Text = "Downloading... $($d.Percent)%"
-                    }
-                }
-                elseif ($d.Type -eq "Done") {
-                    $timer.Stop()
-                    Remove-Job $job -Force
-
-                    $statusLabel.Text = "Launching..."
-                    [System.Windows.Forms.Application]::DoEvents()
-
-                    Start-Process $d.Path
-
-                    $statusLabel.Text = "Done!"
-                    $buttonDownload.Enabled = $true
-                }
-                elseif ($d.Type -eq "Error") {
-                    $timer.Stop()
-                    Remove-Job $job -Force
-
-                    $statusLabel.Text = "Executable not found."
-                    $buttonDownload.Enabled = $true
-                }
-            }
-
-            # 🔥 keep UI alive
-            [System.Windows.Forms.Application]::DoEvents()
-
-        } catch {}
-    })
-
-    $timer.Start()
-}
 
 # =========================
 # EVENTS
@@ -234,36 +206,58 @@ $form.Add_Shown({
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
 
-    [System.Windows.Forms.Application]::DoEvents()
+    $form.Activate()
+    $form.BringToFront()
 })
 
 $seriesCombo.Add_SelectedIndexChanged({
-    $modelList.BeginUpdate()
+    $selectedSeries = $seriesCombo.SelectedItem
     $modelList.Items.Clear()
-    $seriesModels[$seriesCombo.SelectedItem] | ForEach-Object { $modelList.Items.Add($_) }
-    $modelList.EndUpdate()
+    if ($selectedSeries) {
+        $seriesModels[$selectedSeries] | ForEach-Object { $modelList.Items.Add($_) }
+    }
+    $detailLabel.Text = "Model: (none selected)"
+    $buttonDownload.Enabled = $false
+})
+
+$searchBox.Add_TextChanged({
+    if ($searchBox.Text -eq "Search model...") { return }
+
+    $query = $searchBox.Text.ToUpper()
+    $modelList.Items.Clear()
+
+    $selected = $seriesCombo.SelectedItem
+    if ($selected) {
+        $seriesModels[$selected] |
+        Where-Object { $_.ToUpper() -like "*$query*" } |
+        ForEach-Object { $modelList.Items.Add($_) }
+    }
 })
 
 $modelList.Add_SelectedIndexChanged({
-    $sel = $modelList.SelectedItem
-    if ($sel) {
-        $detailLabel.Text = "Model: $sel"
-        $tool = $tools | Where-Object { $_.Model -eq $sel }
-        if ($tool) {
+    $selModel = $modelList.SelectedItem
+    if ($selModel) {
+        $detailLabel.Text = "Model: $selModel"
+        $buttonDownload.Enabled = $false
+
+        $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
+
+        if ($foundTool) {
             $statusLabel.Text = "RESETTER AVAILABLE!"
             $buttonDownload.Enabled = $true
         } else {
-            $statusLabel.Text = "NOT AVAILABLE"
-            $buttonDownload.Enabled = $false
+            $statusLabel.Text = "RESETTER NOT AVAILABLE YET!"
         }
     }
 })
 
 $buttonDownload.Add_Click({
-    $sel = $modelList.SelectedItem
-    if ($sel) {
-        $tool = $tools | Where-Object { $_.Model -eq $sel }
-        if ($tool) { Download-Run $tool }
+    $selModel = $modelList.SelectedItem
+    if ($selModel) {
+        $tool = $tools | Where-Object { $_.Model -eq $selModel }
+        if ($tool) {
+            Download-Run $tool
+        }
     }
 })
 
