@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION (GUI-FRIENDLY)
+# DOWNLOAD FUNCTION (WebClient, PS5.1 compatible)
 # =========================
 function Download-Tool {
     param($tool)
@@ -137,55 +137,36 @@ function Download-Tool {
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-    # Run download in a background job
-    $job = Start-Job -ScriptBlock {
-        param($url,$outFile)
-        $client = [System.Net.Http.HttpClient]::new()
-        $resp = $client.GetAsync($url,[System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-        $total = $resp.Content.Headers.ContentLength
-        $stream = $resp.Content.ReadAsStreamAsync().Result
-        $fs = [System.IO.File]::OpenWrite($outFile)
-        $buffer = New-Object byte[] 8192
-        $read = 0
-        while (($count = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
-            $fs.Write($buffer,0,$count)
-            $read += $count
-            $percent = [int](($read / $total) * 100)
-            Write-Output $percent
-        }
-        $fs.Close()
-    } -ArgumentList $tool.Url, $OutFile
+    $wc = New-Object System.Net.WebClient
 
-    # Monitor job and update progress
-    while ($job.State -eq 'Running') {
-        $percent = Receive-Job -Job $job -Keep -ErrorAction SilentlyContinue | Select-Object -Last 1
-        if ($percent) {
-            $progressBar.Invoke([action]{ $progressBar.Value = $percent })
-            $statusLabel.Invoke([action]{ $statusLabel.Text = "Downloading $percent%" })
-        }
-        Start-Sleep -Milliseconds 100
+    # Progress event
+    $wc.DownloadProgressChanged += {
+        param($sender,$e)
+        $progressBar.Invoke([action]{ $progressBar.Value = $e.ProgressPercentage })
+        $statusLabel.Invoke([action]{ $statusLabel.Text = "Downloading $($e.ProgressPercentage)%" })
     }
 
-    # Ensure all output is received
-    $percent = Receive-Job -Job $job -Keep | Select-Object -Last 1
-    if ($percent) {
-        $progressBar.Value = $percent
-        $statusLabel.Text = "Download complete."
+    # Completion event
+    $wc.DownloadFileCompleted += {
+        param($sender,$e)
+        if ($e.Error) {
+            $statusLabel.Invoke([action]{ $statusLabel.Text = "Error: $($e.Error.Message)" })
+        } else {
+            $statusLabel.Invoke([action]{ $statusLabel.Text = "Download complete. Extracting..." })
+            try {
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+                if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([action]{ $statusLabel.Text = "Done!" }) }
+                else { $statusLabel.Invoke([action]{ $statusLabel.Text = "Executable not found." }) }
+            } catch {
+                $statusLabel.Invoke([action]{ $statusLabel.Text = "Extraction failed: $($_.Exception.Message)" })
+            }
+        }
+        $buttonDownload.Invoke([action]{ $buttonDownload.Enabled = $true })
     }
 
-    Remove-Job $job
-
-    # Extract ZIP
-    $statusLabel.Text = "Extracting..."
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-
-    # Launch EXE
-    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
-    else { $statusLabel.Text = "Executable not found." }
-
-    $progressBar.Value = 100
-    $buttonDownload.Enabled = $true
+    # Start async download
+    $wc.DownloadFileAsync([uri]$tool.Url, $OutFile)
 }
 
 $buttonDownload.Add_Click({
