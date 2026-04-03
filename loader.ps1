@@ -111,6 +111,12 @@ $seriesCombo.Add_SelectedIndexChanged({
     $buttonDownload.Enabled = $false
 })
 
+$searchBox.Add_TextChanged({
+    $text = $searchBox.Text
+    $modelList.Items.Clear()
+    $seriesModels[$seriesCombo.SelectedItem] | Where-Object { $_ -like "*$text*" } | ForEach-Object { $modelList.Items.Add($_) }
+})
+
 $modelList.Add_SelectedIndexChanged({
     $selModel = $modelList.SelectedItem
     if ($selModel) {
@@ -122,14 +128,14 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION (WebClient, PS5.1 compatible)
+# DOWNLOAD FUNCTION (synchronous WebClient)
 # =========================
 function Download-Tool {
     param($tool)
 
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
-    $statusLabel.Text = "Starting download..."
+    $statusLabel.Text = "Downloading..."
 
     $OutFile = Join-Path $OutDir $tool.File
     $ExtractDir = Join-Path $OutDir $tool.Model
@@ -137,36 +143,32 @@ function Download-Tool {
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-    $wc = New-Object System.Net.WebClient
-
-    # Progress event
-    $wc.DownloadProgressChanged += {
-        param($sender,$e)
-        $progressBar.Invoke([action]{ $progressBar.Value = $e.ProgressPercentage })
-        $statusLabel.Invoke([action]{ $statusLabel.Text = "Downloading $($e.ProgressPercentage)%" })
-    }
-
-    # Completion event
-    $wc.DownloadFileCompleted += {
-        param($sender,$e)
-        if ($e.Error) {
-            $statusLabel.Invoke([action]{ $statusLabel.Text = "Error: $($e.Error.Message)" })
-        } else {
-            $statusLabel.Invoke([action]{ $statusLabel.Text = "Download complete. Extracting..." })
-            try {
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-                if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([action]{ $statusLabel.Text = "Done!" }) }
-                else { $statusLabel.Invoke([action]{ $statusLabel.Text = "Executable not found." }) }
-            } catch {
-                $statusLabel.Invoke([action]{ $statusLabel.Text = "Extraction failed: $($_.Exception.Message)" })
-            }
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadProgressChanged += {
+            param($sender,$e)
+            $progressBar.Invoke([action]{ $progressBar.Value = $e.ProgressPercentage })
+            $statusLabel.Invoke([action]{ $statusLabel.Text = "Downloading $($e.ProgressPercentage)%" })
         }
-        $buttonDownload.Invoke([action]{ $buttonDownload.Enabled = $true })
+
+        # Synchronous download ensures complete file before extraction
+        $wc.DownloadFile($tool.Url, $OutFile)
+        $progressBar.Value = 100
+        $statusLabel.Text = "Download complete. Extracting..."
+
+        # Extract ZIP
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+
+        # Launch EXE
+        $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+        if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
+        else { $statusLabel.Text = "Executable not found." }
+
+    } catch {
+        $statusLabel.Text = "Error: $($_.Exception.Message)"
     }
 
-    # Start async download
-    $wc.DownloadFileAsync([uri]$tool.Url, $OutFile)
+    $buttonDownload.Enabled = $true
 }
 
 $buttonDownload.Add_Click({
