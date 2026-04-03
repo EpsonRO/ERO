@@ -1,7 +1,9 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.ComponentModel
 
+# Data
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
 }
@@ -88,7 +90,7 @@ $statusLabel.ForeColor = [System.Drawing.Color]::Black
 $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
-# GUI EVENTS
+# GUI events
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width)/2
     $title.Top = 20
@@ -114,17 +116,19 @@ $modelList.Add_SelectedIndexChanged({
     }
 })
 
-# DOWNLOAD FUNCTION WITHOUT EVENTS
+# Download function using BackgroundWorker
 function Download-Run {
     param($tool)
-
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    Start-Job -ArgumentList $tool, $progressBar, $statusLabel -ScriptBlock {
-        param($tool, $progressBar, $statusLabel)
-        $OutDir = Join-Path $env:TEMP "ERO-Tools"
+    $bgWorker = New-Object System.ComponentModel.BackgroundWorker
+    $bgWorker.WorkerReportsProgress = $true
+    $bgWorker.WorkerSupportsCancellation = $false
+
+    $bgWorker.DoWork += {
+        param($sender,$e)
         $OutFile = Join-Path $OutDir $tool.File
         $ExtractDir = Join-Path $OutDir $tool.Model
 
@@ -133,28 +137,30 @@ function Download-Run {
 
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
+
+        # Manual progress update
         $wc.DownloadFile($tool.Url, $OutFile)
 
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+        $bgWorker.ReportProgress(100)
 
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
         if ($exe) { Start-Process $exe.FullName }
-    } | Out-Null
+    }
 
-    # simple polling for completion
-    $timer = New-Object System.Windows.Forms.Timer
-    $timer.Interval = 200
-    $timer.Add_Tick({
-        $progressBar.Value = ($progressBar.Value + 5) % 100
-        if ((Get-Job | Where-Object {$_.State -eq "Completed"})) {
-            $timer.Stop()
-            Remove-Job -State Completed -Force
-            $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
-            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
-            $buttonDownload.Enabled = $true
-        }
-    })
-    $timer.Start()
+    $bgWorker.ProgressChanged += {
+        param($sender,$e)
+        $progressBar.Value = $e.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
+    }
+
+    $bgWorker.RunWorkerCompleted += {
+        $progressBar.Value = 100
+        $statusLabel.Text = "Done!"
+        $buttonDownload.Enabled = $true
+    }
+
+    $bgWorker.RunWorkerAsync()
 }
 
 $buttonDownload.Add_Click({
