@@ -1,70 +1,56 @@
 # =========================
-# Epson Resetter - Pure PowerShell Console
+# Download & Run Epson L3150 Resetter (PowerShell Console)
 # =========================
 
-# Output folder
-$OutDir = "$env:TEMP\ERO-Tools"
-if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out-Null }
+# --- SETTINGS ---
+$dropboxUrl = "https://www.dropbox.com/scl/fi/yuscc3h8xmfetwb08wnfn/L3150.zip?rlkey=6hem5wrgingwyyly8kng7l6r2&st=t7n6eqj2&dl=1"
+$OutDir = "$env:TEMP\Epson-L3150"
+$zipFile = Join-Path $OutDir "L3150.zip"
+$extractDir = Join-Path $OutDir "L3150"
 
-# Printer models and URLs
-$tools = @(
-    @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L3150/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
-)
+# Create output directory
+if (-not (Test-Path $OutDir)) {
+    New-Item -ItemType Directory -Path $OutDir | Out-Null
+}
 
-# ----------------------
-# Select model
-# ----------------------
-Write-Host "Available Models:" -ForegroundColor Cyan
-for ($i=0; $i -lt $tools.Count; $i++) { Write-Host "$($i+1)) $($tools[$i].Model)" }
+# Remove old files if present
+if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
+if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
 
-[int]$choice = Read-Host "Enter the number of your printer model"
-if ($choice -lt 1 -or $choice -gt $tools.Count) { Write-Host "Invalid choice!" -ForegroundColor Red; exit }
-
-$tool = $tools[$choice - 1]
-$OutFile = Join-Path $OutDir $tool.File
-$ExtractDir = Join-Path $OutDir $tool.Model
-
-# ----------------------
-# Remove old files if they exist
-# ----------------------
-if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-
-# ----------------------
-# Download with Invoke-WebRequest (GitHub-friendly)
-# ----------------------
-Write-Host "Downloading $($tool.Model)..."
+# --- DOWNLOAD ---
+Write-Host "Downloading L3150 Resetter..." -ForegroundColor Cyan
 
 try {
-    Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
+    Invoke-WebRequest -Uri $dropboxUrl -OutFile $zipFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
     Write-Host "Download complete!" -ForegroundColor Green
 } catch {
-    Write-Host "Download failed! Check your internet connection or URL." -ForegroundColor Red
+    Write-Host "Download failed! Check the link or your internet connection." -ForegroundColor Red
     exit
 }
 
-# ----------------------
-# Extract ZIP
-# ----------------------
-Write-Host "Extracting ZIP..."
+# --- EXTRACT ZIP ---
+Write-Host "Extracting Resetter ZIP..." -ForegroundColor Cyan
+
 try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $extractDir)
     Write-Host "Extraction complete!" -ForegroundColor Green
 } catch {
-    Write-Host "Error extracting ZIP!" -ForegroundColor Red
+    Write-Host "ZIP extraction failed!" -ForegroundColor Red
     exit
 }
 
-# ----------------------
-# Launch executable
-# ----------------------
-$exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+# --- RUN EXECUTABLE ---
+Write-Host "Searching for AdjProg.exe..." -ForegroundColor Cyan
+
+$exe = Get-ChildItem -Path $extractDir -Recurse -Filter "AdjProg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+
 if ($exe) {
-    Write-Host "Launching $($tool.Exe)..."
+    Write-Host "Launching AdjProg.exe..." -ForegroundColor Cyan
     Start-Process $exe.FullName
-    Write-Host "Done!"
+    Write-Host "Done!" -ForegroundColor Green
 } else {
-    Write-Host "Executable not found!" -ForegroundColor Red
+    Write-Host "AdjProg.exe not found in the extracted files." -ForegroundColor Red
 }
+
+exit
