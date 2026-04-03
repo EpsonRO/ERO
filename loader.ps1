@@ -12,7 +12,7 @@ $seriesModels = @{
 }
 
 # =========================
-# AVAILABLE TOOLS
+# TOOLS
 # =========================
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"}
@@ -20,7 +20,7 @@ $tools = @(
 )
 
 # =========================
-# TEMP OUTPUT DIRECTORY
+# TEMP DIR
 # =========================
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
@@ -37,13 +37,13 @@ $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 
-# 🔥 reduce flicker
+# reduce flicker
 $form.GetType().GetProperty("DoubleBuffered",[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance).SetValue($form,$true,$null)
 
 # TITLE
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "EPSON RESETTER ONLINE"
-$title.ForeColor = [System.Drawing.Color]::White
+$title.ForeColor = "White"
 $title.Font = New-Object System.Drawing.Font("Segoe UI",16,[System.Drawing.FontStyle]::Bold)
 $title.AutoSize = $true
 $form.Controls.Add($title)
@@ -55,13 +55,13 @@ $seriesCombo.Items.AddRange($seriesModels.Keys)
 $seriesCombo.Location = New-Object System.Drawing.Point(30,80)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $seriesCombo.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$seriesCombo.ForeColor = [System.Drawing.Color]::White
+$seriesCombo.ForeColor = "White"
 $form.Controls.Add($seriesCombo)
 
 # SEARCH
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
-$searchBox.ForeColor = [System.Drawing.Color]::Gray
+$searchBox.ForeColor = "Gray"
 $searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $form.Controls.Add($searchBox)
@@ -85,7 +85,7 @@ $modelList = New-Object System.Windows.Forms.ListBox
 $modelList.Location = New-Object System.Drawing.Point(30,120)
 $modelList.Size = New-Object System.Drawing.Size(490,200)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
-$modelList.ForeColor = [System.Drawing.Color]::White
+$modelList.ForeColor = "White"
 $form.Controls.Add($modelList)
 
 # DETAILS
@@ -105,7 +105,7 @@ $buttonDownload.ForeColor = "White"
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
 
-# PROGRESS BAR
+# PROGRESS
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(30,420)
 $progressBar.Size = New-Object System.Drawing.Size(490,20)
@@ -126,7 +126,7 @@ $statusStrip.Items.Add($copyright)
 $form.Controls.Add($statusStrip)
 
 # =========================
-# DOWNLOAD (BACKGROUND)
+# DOWNLOAD (BACKGROUND + NO FREEZE)
 # =========================
 function Download-Run($tool)
 {
@@ -184,31 +184,41 @@ function Download-Run($tool)
     $timer.Interval = 200
 
     $timer.Add_Tick({
-        $data = Receive-Job $job -Keep
+        try {
+            $data = Receive-Job $job -Keep -ErrorAction SilentlyContinue
 
-        foreach ($d in $data) {
-            if ($d.Type -eq "Progress") {
-                $progressBar.Value = $d.Percent
-                $statusLabel.Text = "Downloading... $($d.Percent)%"
+            foreach ($d in $data) {
+                if ($d.Type -eq "Progress") {
+                    if ($d.Percent -le 100) {
+                        $progressBar.Value = $d.Percent
+                        $statusLabel.Text = "Downloading... $($d.Percent)%"
+                    }
+                }
+                elseif ($d.Type -eq "Done") {
+                    $timer.Stop()
+                    Remove-Job $job -Force
+
+                    $statusLabel.Text = "Launching..."
+                    [System.Windows.Forms.Application]::DoEvents()
+
+                    Start-Process $d.Path
+
+                    $statusLabel.Text = "Done!"
+                    $buttonDownload.Enabled = $true
+                }
+                elseif ($d.Type -eq "Error") {
+                    $timer.Stop()
+                    Remove-Job $job -Force
+
+                    $statusLabel.Text = "Executable not found."
+                    $buttonDownload.Enabled = $true
+                }
             }
-            elseif ($d.Type -eq "Done") {
-                $timer.Stop()
-                Remove-Job $job
 
-                $statusLabel.Text = "Launching..."
-                Start-Process $d.Path
+            # 🔥 keep UI alive
+            [System.Windows.Forms.Application]::DoEvents()
 
-                $statusLabel.Text = "Done!"
-                $buttonDownload.Enabled = $true
-            }
-            elseif ($d.Type -eq "Error") {
-                $timer.Stop()
-                Remove-Job $job
-
-                $statusLabel.Text = "Executable not found."
-                $buttonDownload.Enabled = $true
-            }
-        }
+        } catch {}
     })
 
     $timer.Start()
@@ -223,6 +233,8 @@ $form.Add_Shown({
 
     $seriesCombo.SelectedItem = "L-Series"
     $seriesModels["L-Series"] | ForEach-Object { $modelList.Items.Add($_) }
+
+    [System.Windows.Forms.Application]::DoEvents()
 })
 
 $seriesCombo.Add_SelectedIndexChanged({
