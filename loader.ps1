@@ -1,7 +1,6 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-Add-Type -AssemblyName System.ComponentModel
 
 # =========================
 # SERIES & MODELS DATA
@@ -123,27 +122,38 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD WITH BACKGROUNDWORKER
+# DOWNLOAD FUNCTION USING RUNSPACE
 # =========================
-$bgWorker = New-Object System.ComponentModel.BackgroundWorker
-$bgWorker.WorkerReportsProgress = $true
-
-$buttonDownload.Add_Click({
-    $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
-    if (-not $tool) { return }
-
+function Start-Download($tool) {
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    $bgWorker.DoWork.Add({
-        param($sender,$e)
+    $rs = [runspacefactory]::CreateRunspace()
+    $rs.ApartmentState = "STA"
+    $rs.ThreadOptions = "ReuseThread"
+    $rs.Open()
+    $ps = [powershell]::Create()
+    $ps.Runspace = $rs
+
+    $ps.AddScript({
+        param($tool,$OutDir)
+
         $OutFile = Join-Path $OutDir $tool.File
         if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
-        $wc.DownloadProgressChanged.Add({ param($s,$ev) $sender.ReportProgress($ev.ProgressPercentage) })
+
+        $wc.DownloadProgressChanged.Add({
+            param($s,$ev)
+            $progress = $ev.ProgressPercentage
+            [System.Windows.Forms.Application]::Invoke({
+                $script:progressBar.Value = $progress
+                $script:statusLabel.Text = "Downloading... $progress%"
+            })
+        })
+
         $wc.DownloadFile($tool.Url, $OutFile)
 
         $ExtractDir = Join-Path $OutDir $tool.Model
@@ -153,12 +163,21 @@ $buttonDownload.Add_Click({
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
         if ($exe) { Start-Process $exe.FullName }
-    })
+    }).AddArgument($tool).AddArgument($OutDir)
 
-    $bgWorker.ProgressChanged.Add({ param($s,$ev) $progressBar.Value = $ev.ProgressPercentage })
-    $bgWorker.RunWorkerCompleted.Add({ param($s,$ev) $statusLabel.Text="Done!"; $buttonDownload.Enabled=$true })
+    $asyncResult = $ps.BeginInvoke()
+    Register-ObjectEvent -InputObject $ps -EventName "Disposed" -Action {
+        [System.Windows.Forms.Application]::Invoke({
+            $progressBar.Value = 100
+            $statusLabel.Text = "Done!"
+            $buttonDownload.Enabled = $true
+        })
+    }
+}
 
-    $bgWorker.RunWorkerAsync()
+$buttonDownload.Add_Click({
+    $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
+    if ($tool) { Start-Download $tool }
 })
 
 $form.ShowDialog()
