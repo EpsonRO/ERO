@@ -15,7 +15,7 @@ $allModels = @{
 }
 
 # Prompt user
-$model = Read-Host "Enter your printer model (e.g., L6190, L3150)"
+$model = Read-Host "Enter your printer model: "
 
 # Logic check
 if (-not $allModels.ContainsKey($model)) {
