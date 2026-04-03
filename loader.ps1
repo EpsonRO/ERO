@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # =========================
-# SERIES & MODELS DATA
+# DATA
 # =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
@@ -11,7 +11,7 @@ $seriesModels = @{
 
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L3150"; Url="https://github.com/EpsonRO/L3150/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
@@ -19,7 +19,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# GUI SETUP
+# GUI
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# ASYNC DOWNLOAD FUNCTION
+# ASYNC DOWNLOAD FUNCTION (WORKS)
 # =========================
 function Download-Tool {
     param($tool)
@@ -141,23 +141,24 @@ function Download-Tool {
     $wc.Headers.Add("User-Agent","Mozilla/5.0")
 
     $wc.DownloadProgressChanged.Add({
-        param($sender,$e)
-        $progressBar.Invoke([Action]{ $progressBar.Value = $e.ProgressPercentage })
-        $statusLabel.Invoke([Action]{ $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%" })
+        param($s,$e)
+        $progressBar.Value = $e.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
+        $form.Refresh()
     })
 
     $wc.DownloadFileCompleted.Add({
-        param($sender,$e)
+        param($s,$e)
         try {
             [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
             $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
             if ($exe) { Start-Process $exe.FullName }
-            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
+            $statusLabel.Text = "Done!"
         } catch {
-            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Error extracting or launching." })
+            $statusLabel.Text = "Error extracting or launching."
         }
-        $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
-        $buttonDownload.Invoke([Action]{ $buttonDownload.Enabled = $true })
+        $progressBar.Value = 100
+        $buttonDownload.Enabled = $true
     })
 
     $wc.DownloadFileAsync([uri]$tool.Url, $OutFile)
