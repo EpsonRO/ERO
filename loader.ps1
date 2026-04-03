@@ -1,5 +1,5 @@
 # =========================
-# Epson Resetter Console Downloader (Smart Version)
+# Epson Resetter Console Downloader (Safe Version)
 # =========================
 
 # Output directory
@@ -10,24 +10,26 @@ if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out
 $allModels = @{
     "L6190" = "https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"
     "L3150" = "https://www.dropbox.com/scl/fi/yuscc3h8xmfetwb08wnfn/L3150.zip?dl=1"
-    "L8050" = $null   # Example of a model known but no resetter yet
+    "L8050" = $null   # Known model but no resetter yet
     "L4550" = $null
 }
 
 # Prompt user
-$model = Read-Host "Enter your printer model"
+$model = Read-Host "Enter your printer model (e.g., L6190, L3150)"
 
 # Logic check
 if (-not $allModels.ContainsKey($model)) {
     Write-Host "`nNot a valid model." -ForegroundColor Red
-    exit
+    Read-Host "`nPress Enter to exit..."
+    return
 }
 
 # Model exists
 $link = $allModels[$model]
 if ([string]::IsNullOrEmpty($link)) {
     Write-Host "`nResetter not added yet for $model." -ForegroundColor Yellow
-    exit
+    Read-Host "`nPress Enter to exit..."
+    return
 }
 
 # Download and run
@@ -45,7 +47,8 @@ try {
     Write-Host "Download complete!" -ForegroundColor Green
 } catch {
     Write-Host "Download failed! Check your internet connection or URL." -ForegroundColor Red
-    exit
+    Read-Host "`nPress Enter to exit..."
+    return
 }
 
 # Extract
@@ -56,7 +59,8 @@ try {
     Write-Host "Extraction complete!" -ForegroundColor Green
 } catch {
     Write-Host "ZIP extraction failed!" -ForegroundColor Red
-    exit
+    Read-Host "`nPress Enter to exit..."
+    return
 }
 
 # Launch executable
@@ -68,3 +72,6 @@ if ($exe) {
 } else {
     Write-Host "AdjProg.exe not found in extracted files." -ForegroundColor Red
 }
+
+# Pause at end
+Read-Host "`nPress Enter to exit..."
