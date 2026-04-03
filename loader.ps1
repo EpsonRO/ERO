@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION
+# DOWNLOAD FUNCTION (PS7+ compatible)
 # =========================
 function Download-Tool {
     param($tool)
@@ -139,18 +139,15 @@ function Download-Tool {
 
     $wc = New-Object System.Net.WebClient
 
-    # Progress
-    $wc.DownloadProgressChanged.Add({
-        param($sender, $e)
-        $progressBar.Value = $e.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
-    })
+    # Register events
+    Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action {
+        $progressBar.Value = $EventArgs.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($EventArgs.ProgressPercentage)%"
+    } | Out-Null
 
-    # Completed
-    $wc.DownloadFileCompleted.Add({
-        param($sender, $e)
-        if ($e.Error) {
-            $statusLabel.Text = "Download failed: $($e.Error.Message)"
+    Register-ObjectEvent -InputObject $wc -EventName DownloadFileCompleted -Action {
+        if ($EventArgs.Error) {
+            $statusLabel.Text = "Download failed: $($EventArgs.Error.Message)"
         } else {
             $statusLabel.Text = "Extracting..."
             try {
@@ -168,7 +165,7 @@ function Download-Tool {
         }
         $progressBar.Value = 100
         $buttonDownload.Enabled = $true
-    })
+    } | Out-Null
 
     # Start download
     $wc.DownloadFileAsync([Uri]$tool.Url, $OutFile)
