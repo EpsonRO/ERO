@@ -19,7 +19,7 @@ if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # =========================
-# ORIGINAL GUI
+# GUI SETUP
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
@@ -122,22 +122,18 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION USING RUNSPACE
+# BACKGROUND DOWNLOAD FUNCTION
 # =========================
-function Start-Download($tool) {
+function Download-Run($tool) {
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    $rs = [runspacefactory]::CreateRunspace()
-    $rs.ApartmentState = "STA"
-    $rs.ThreadOptions = "ReuseThread"
-    $rs.Open()
-    $ps = [powershell]::Create()
-    $ps.Runspace = $rs
+    $bgWorker = New-Object System.ComponentModel.BackgroundWorker
+    $bgWorker.WorkerReportsProgress = $true
 
-    $ps.AddScript({
-        param($tool,$OutDir)
+    $bgWorker.DoWork += {
+        param($sender, $e)
 
         $OutFile = Join-Path $OutDir $tool.File
         if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
@@ -147,11 +143,7 @@ function Start-Download($tool) {
 
         $wc.DownloadProgressChanged.Add({
             param($s,$ev)
-            $progress = $ev.ProgressPercentage
-            [System.Windows.Forms.Application]::Invoke({
-                $script:progressBar.Value = $progress
-                $script:statusLabel.Text = "Downloading... $progress%"
-            })
+            $sender.ReportProgress($ev.ProgressPercentage)
         })
 
         $wc.DownloadFile($tool.Url, $OutFile)
@@ -162,22 +154,29 @@ function Start-Download($tool) {
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) { Start-Process $exe.FullName }
-    }).AddArgument($tool).AddArgument($OutDir)
-
-    $asyncResult = $ps.BeginInvoke()
-    Register-ObjectEvent -InputObject $ps -EventName "Disposed" -Action {
-        [System.Windows.Forms.Application]::Invoke({
-            $progressBar.Value = 100
-            $statusLabel.Text = "Done!"
-            $buttonDownload.Enabled = $true
-        })
+        $e.Result = $exe
     }
+
+    $bgWorker.ProgressChanged += {
+        param($s,$ev)
+        $progressBar.Value = $ev.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($ev.ProgressPercentage)%"
+    }
+
+    $bgWorker.RunWorkerCompleted += {
+        param($s,$e)
+        $progressBar.Value = 100
+        if ($e.Result) { Start-Process $e.Result.FullName; $statusLabel.Text = "Done!" }
+        else { $statusLabel.Text = "Executable not found." }
+        $buttonDownload.Enabled = $true
+    }
+
+    $bgWorker.RunWorkerAsync()
 }
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
-    if ($tool) { Start-Download $tool }
+    if ($tool) { Download-Run $tool }
 })
 
 $form.ShowDialog()
