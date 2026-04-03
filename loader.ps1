@@ -1,6 +1,7 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.ComponentModel
 
 # =========================
 # SERIES & MODELS DATA
@@ -128,52 +129,44 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION (synchronous WebClient)
+# BACKGROUNDWORKER DOWNLOAD FUNCTION
 # =========================
-function Download-Tool {
-    param($tool)
+$worker = New-Object System.ComponentModel.BackgroundWorker
+$worker.WorkerReportsProgress = $true
+$worker.WorkerSupportsCancellation = $true
 
-    $buttonDownload.Enabled = $false
-    $progressBar.Value = 0
-    $statusLabel.Text = "Downloading..."
-
-    $OutFile = Join-Path $OutDir $tool.File
-    $ExtractDir = Join-Path $OutDir $tool.Model
-
-    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-
+$worker.DoWork += {
+    param($sender,$e)
+    $tool = $e.Argument
     try {
+        $OutFile = Join-Path $OutDir $tool.File
+        $ExtractDir = Join-Path $OutDir $tool.Model
+        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+
         $wc = New-Object System.Net.WebClient
-        $wc.DownloadProgressChanged += {
-            param($sender,$e)
-            $progressBar.Invoke([action]{ $progressBar.Value = $e.ProgressPercentage })
-            $statusLabel.Invoke([action]{ $statusLabel.Text = "Downloading $($e.ProgressPercentage)%" })
-        }
-
-        # Synchronous download ensures complete file before extraction
+        $wc.DownloadProgressChanged += { param($s,$p) $sender.ReportProgress($p.ProgressPercentage) }
         $wc.DownloadFile($tool.Url, $OutFile)
-        $progressBar.Value = 100
-        $statusLabel.Text = "Download complete. Extracting..."
 
-        # Extract ZIP
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-
-        # Launch EXE
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
-        else { $statusLabel.Text = "Executable not found." }
-
+        $e.Result = $exe.FullName
     } catch {
-        $statusLabel.Text = "Error: $($_.Exception.Message)"
+        $e.Result = $_.Exception.Message
     }
+}
 
+$worker.ProgressChanged += { param($s,$p) $progressBar.Value = $p.ProgressPercentage; $statusLabel.Text = "Downloading $($p.ProgressPercentage)%" }
+$worker.RunWorkerCompleted += { 
+    param($s,$e)
+    if (Test-Path $e.Result) { Start-Process $e.Result; $statusLabel.Text="Done!" } 
+    else { $statusLabel.Text = "Error: $($e.Result)" }
     $buttonDownload.Enabled = $true
 }
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
-    if ($tool) { Download-Tool $tool }
+    if ($tool) { $buttonDownload.Enabled=$false; $worker.RunWorkerAsync($tool) }
 })
 
 $form.ShowDialog()
