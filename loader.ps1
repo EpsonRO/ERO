@@ -146,44 +146,42 @@ $buttonDownload.Add_Click({
         $progressBar.Value = 0
         $statusLabel.Text = "Downloading..."
 
-        # Download in separate thread to prevent GUI freeze
-        $thread = [System.Threading.Thread]{
-            param($tool,$OutDir,$progressBar,$statusLabel)
-            $OutFile = Join-Path $OutDir $tool.File
-            $ExtractDir = Join-Path $OutDir $tool.Model
+        $OutFile = Join-Path $OutDir $tool.File
+        $ExtractDir = Join-Path $OutDir $tool.Model
 
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent","Mozilla/5.0")
+        # Remove old files
+        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-            $wc.DownloadProgressChanged += {
-                $progressBar.Value = $_.ProgressPercentage
-                $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
-            }
+        # Use WebClient for download with progress
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent","Mozilla/5.0")
 
-            $wc.DownloadFileCompleted += {
-                $statusLabel.Text = "Download complete!"
-            }
-
-            $wc.DownloadFile($tool.Url, $OutFile)
-
-            # Extract ZIP
-            if (Test-Path $OutFile) {
-                try {
-                    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-                    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-                    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-                    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
-                    else { $statusLabel.Text="Executable not found." }
-                } catch { $statusLabel.Text="Error extracting ZIP." }
-            } else { $statusLabel.Text="Download failed." }
+        $wc.DownloadProgressChanged += {
+            $progressBar.Value = $_.ProgressPercentage
+            $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
         }
 
-        $thread.Start($tool,$OutDir,$progressBar,$statusLabel)
-        $thread.Join()
-        $buttonDownload.Enabled = $true
+        $wc.DownloadFileCompleted += {
+            $statusLabel.Text = "Download complete!"
+
+            # Extract ZIP after download
+            try {
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+                if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
+                else { $statusLabel.Text="Executable not found." }
+            } catch {
+                $statusLabel.Text="Error extracting ZIP."
+            }
+
+            $buttonDownload.Enabled = $true
+        }
+
+        # Start async download
+        $wc.DownloadFileAsync($tool.Url, $OutFile)
     }
 })
-
 # =========================
 # SHOW GUI
 # =========================
