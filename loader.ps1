@@ -4,6 +4,7 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.ComponentModel
 
 # =========================
 # SERIES & MODELS DATA
@@ -137,51 +138,61 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD & LAUNCH FUNCTION
+# DOWNLOAD & LAUNCH FUNCTION USING BACKGROUNDWORKER
 # =========================
+$worker = New-Object System.ComponentModel.BackgroundWorker
+$worker.WorkerReportsProgress = $true
+
+$worker.DoWork += {
+    param($sender,$e)
+    $tool = $e.Argument
+    $OutFile = Join-Path $OutDir $tool.File
+    $ExtractDir = Join-Path $OutDir $tool.Model
+
+    # Remove old files
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add("User-Agent","Mozilla/5.0")
+    $wc.DownloadProgressChanged += {
+        param($s,$ev)
+        $sender.ReportProgress($ev.ProgressPercentage)
+    }
+
+    $wc.DownloadFile($tool.Url,$OutFile)
+
+    # Extract ZIP
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+    $e.Result = $tool
+}
+
+$worker.ProgressChanged += {
+    param($s,$e)
+    $progressBar.Value = $e.ProgressPercentage
+    $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
+}
+
+$worker.RunWorkerCompleted += {
+    param($s,$e)
+    $tool = $e.Result
+    $statusLabel.Text = "Download complete!"
+    $exe = Get-ChildItem -Path (Join-Path $OutDir $tool.Model) -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
+    else { $statusLabel.Text="Executable not found." }
+    $buttonDownload.Enabled = $true
+}
+
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
     if ($tool) {
         $buttonDownload.Enabled = $false
         $progressBar.Value = 0
-        $statusLabel.Text = "Downloading..."
-
-        $OutFile = Join-Path $OutDir $tool.File
-        $ExtractDir = Join-Path $OutDir $tool.Model
-
-        # Remove old files
-        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-
-        # Use WebClient for download with progress
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent","Mozilla/5.0")
-
-        $wc.DownloadProgressChanged += {
-            $progressBar.Value = $_.ProgressPercentage
-            $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
-        }
-
-        $wc.DownloadFileCompleted += {
-            $statusLabel.Text = "Download complete!"
-
-            # Extract ZIP after download
-            try {
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-                if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
-                else { $statusLabel.Text="Executable not found." }
-            } catch {
-                $statusLabel.Text="Error extracting ZIP."
-            }
-
-            $buttonDownload.Enabled = $true
-        }
-
-        # Start async download
-        $wc.DownloadFileAsync($tool.Url, $OutFile)
+        $statusLabel.Text = "Starting download..."
+        $worker.RunWorkerAsync($tool)
     }
 })
+
 # =========================
 # SHOW GUI
 # =========================
