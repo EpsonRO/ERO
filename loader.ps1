@@ -1,23 +1,26 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-Add-Type -AssemblyName System.ComponentModel
 
-# Data
+# =========================
+# SERIES & MODELS DATA
+# =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
 }
 
 $tools = @(
     @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L3150/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L3150"; Url="https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
-# GUI
+# =========================
+# GUI SETUP
+# =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
 $form.Size = New-Object System.Drawing.Size(580,520)
@@ -70,7 +73,7 @@ $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # Blue
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -90,7 +93,9 @@ $statusLabel.ForeColor = [System.Drawing.Color]::Black
 $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
-# GUI events
+# =========================
+# GUI EVENTS
+# =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width)/2
     $title.Top = 20
@@ -112,60 +117,58 @@ $modelList.Add_SelectedIndexChanged({
         $detailLabel.Text = "Model: $selModel"
         $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
         $buttonDownload.Enabled = $foundTool -ne $null
-        $statusLabel.Text = if ($foundTool) {"RESETTER AVAILABLE!"} else {"RESETTER NOT AVAILABLE YET!"}
+        if ($foundTool) { $statusLabel.Text = "RESETTER AVAILABLE!" } else { $statusLabel.Text = "RESETTER NOT AVAILABLE YET!" }
     }
 })
 
-# Download function using BackgroundWorker
-function Download-Run {
+# =========================
+# ASYNC DOWNLOAD FUNCTION
+# =========================
+function Download-Tool {
     param($tool)
+
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    $bgWorker = New-Object System.ComponentModel.BackgroundWorker
-    $bgWorker.WorkerReportsProgress = $true
-    $bgWorker.WorkerSupportsCancellation = $false
+    $OutFile = Join-Path $OutDir $tool.File
+    $ExtractDir = Join-Path $OutDir $tool.Model
 
-    $bgWorker.DoWork += {
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add("User-Agent","Mozilla/5.0")
+
+    $wc.DownloadProgressChanged.Add({
         param($sender,$e)
-        $OutFile = Join-Path $OutDir $tool.File
-        $ExtractDir = Join-Path $OutDir $tool.Model
+        $progressBar.Invoke([Action]{ $progressBar.Value = $e.ProgressPercentage })
+        $statusLabel.Invoke([Action]{ $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%" })
+    })
 
-        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent","Mozilla/5.0")
-
-        # Manual progress update
-        $wc.DownloadFile($tool.Url, $OutFile)
-
-        $bgWorker.ReportProgress(100)
-
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
-        $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) { Start-Process $exe.FullName }
-    }
-
-    $bgWorker.ProgressChanged += {
+    $wc.DownloadFileCompleted.Add({
         param($sender,$e)
-        $progressBar.Value = $e.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
-    }
+        try {
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+            $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+            if ($exe) { Start-Process $exe.FullName }
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
+        } catch {
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Error extracting or launching." })
+        }
+        $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
+        $buttonDownload.Invoke([Action]{ $buttonDownload.Enabled = $true })
+    })
 
-    $bgWorker.RunWorkerCompleted += {
-        $progressBar.Value = 100
-        $statusLabel.Text = "Done!"
-        $buttonDownload.Enabled = $true
-    }
-
-    $bgWorker.RunWorkerAsync()
+    $wc.DownloadFileAsync([uri]$tool.Url, $OutFile)
 }
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
-    if ($tool) { Download-Run $tool }
+    if ($tool) { Download-Tool $tool }
 })
 
+# =========================
+# SHOW FORM
+# =========================
 $form.ShowDialog()
