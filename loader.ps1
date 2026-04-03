@@ -83,12 +83,12 @@ $detailLabel.Location = New-Object System.Drawing.Point(30,330)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
-# Download Button
+# Download Button (blue)
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
-$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,120,215)
+$buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # bright blue
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
@@ -100,11 +100,13 @@ $progressBar.Location = New-Object System.Drawing.Point(30,420)
 $progressBar.Size = New-Object System.Drawing.Size(490,20)
 $form.Controls.Add($progressBar)
 
-# Status Strip
+# Status Strip (light)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
 $statusStrip.Dock = "Bottom"
+$statusStrip.BackColor = [System.Drawing.Color]::White
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $statusLabel.Text = "Ready"
+$statusLabel.ForeColor = [System.Drawing.Color]::Black
 $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
@@ -151,7 +153,6 @@ $modelList.Add_SelectedIndexChanged({
 # =========================
 $bgWorker = New-Object System.ComponentModel.BackgroundWorker
 $bgWorker.WorkerReportsProgress = $true
-$bgWorker.WorkerSupportsCancellation = $false
 
 $toolToDownload = $null
 
@@ -159,21 +160,12 @@ $bgWorker.DoWork += {
     param($sender, $e)
     $tool = $e.Argument
 
-    # Download file
     $OutFile = Join-Path $OutDir $tool.File
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 
     $wc = New-Object System.Net.WebClient
     $wc.Headers.Add("User-Agent","Mozilla/5.0")
-    $wc.DownloadProgressChanged += {
-        param($s, $progressEvent)
-        $bgWorker.ReportProgress($progressEvent.ProgressPercentage, "Downloading... $($progressEvent.ProgressPercentage)%")
-    }
-    $wc.DownloadFileCompleted += {
-        param($s, $completeEvent)
-        # Nothing to do here, handled in RunWorkerCompleted
-    }
-
+    $wc.DownloadProgressChanged += { param($s,$p) $bgWorker.ReportProgress($p.ProgressPercentage,"Downloading... $($p.ProgressPercentage)%") }
     $wc.DownloadFile($tool.Url, $OutFile)
 
     # Extract
