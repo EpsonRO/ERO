@@ -129,13 +129,14 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# BACKGROUNDWORKER DOWNLOAD FUNCTION
+# BACKGROUNDWORKER DOWNLOAD FUNCTION USING Register-ObjectEvent
 # =========================
 $worker = New-Object System.ComponentModel.BackgroundWorker
 $worker.WorkerReportsProgress = $true
 $worker.WorkerSupportsCancellation = $true
 
-$worker.DoWork += {
+# DoWork
+Register-ObjectEvent -InputObject $worker -EventName DoWork -Action {
     param($sender,$e)
     $tool = $e.Argument
     try {
@@ -145,7 +146,11 @@ $worker.DoWork += {
         if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
         $wc = New-Object System.Net.WebClient
-        $wc.DownloadProgressChanged += { param($s,$p) $sender.ReportProgress($p.ProgressPercentage) }
+        Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action {
+            param($s,$p)
+            $sender.ReportProgress($p.ProgressPercentage)
+        }
+
         $wc.DownloadFile($tool.Url, $OutFile)
 
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
@@ -156,17 +161,28 @@ $worker.DoWork += {
     }
 }
 
-$worker.ProgressChanged += { param($s,$p) $progressBar.Value = $p.ProgressPercentage; $statusLabel.Text = "Downloading $($p.ProgressPercentage)%" }
-$worker.RunWorkerCompleted += { 
+# ProgressChanged
+Register-ObjectEvent -InputObject $worker -EventName ProgressChanged -Action {
+    param($s,$p)
+    $progressBar.Value = $p.ProgressPercentage
+    $statusLabel.Text = "Downloading $($p.ProgressPercentage)%"
+}
+
+# RunWorkerCompleted
+Register-ObjectEvent -InputObject $worker -EventName RunWorkerCompleted -Action {
     param($s,$e)
-    if (Test-Path $e.Result) { Start-Process $e.Result; $statusLabel.Text="Done!" } 
+    if (Test-Path $e.Result) { Start-Process $e.Result; $statusLabel.Text="Done!" }
     else { $statusLabel.Text = "Error: $($e.Result)" }
     $buttonDownload.Enabled = $true
 }
 
+# Button click
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
     if ($tool) { $buttonDownload.Enabled=$false; $worker.RunWorkerAsync($tool) }
 })
 
+# =========================
+# SHOW GUI
+# =========================
 $form.ShowDialog()
