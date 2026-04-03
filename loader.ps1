@@ -2,6 +2,7 @@
 # Epson Resetter - Pure PowerShell Console
 # =========================
 
+# Output folder
 $OutDir = "$env:TEMP\ERO-Tools"
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out-Null }
 
@@ -15,51 +16,29 @@ $tools = @(
 # Select model
 # ----------------------
 Write-Host "Available Models:" -ForegroundColor Cyan
-for ($i=0; $i -lt $tools.Count; $i++) {
-    Write-Host "$($i+1)) $($tools[$i].Model)"
-}
+for ($i=0; $i -lt $tools.Count; $i++) { Write-Host "$($i+1)) $($tools[$i].Model)" }
 
 [int]$choice = Read-Host "Enter the number of your printer model"
-if ($choice -lt 1 -or $choice -gt $tools.Count) {
-    Write-Host "Invalid choice!" -ForegroundColor Red
-    exit
-}
+if ($choice -lt 1 -or $choice -gt $tools.Count) { Write-Host "Invalid choice!" -ForegroundColor Red; exit }
 
 $tool = $tools[$choice - 1]
 $OutFile = Join-Path $OutDir $tool.File
 $ExtractDir = Join-Path $OutDir $tool.Model
 
 # ----------------------
-# Remove old files
+# Remove old files if they exist
 # ----------------------
 if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
 # ----------------------
-# Download with manual progress
+# Download with Invoke-WebRequest (GitHub-friendly)
 # ----------------------
 Write-Host "Downloading $($tool.Model)..."
 
 try {
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent","Mozilla/5.0")
-
-    $response = $wc.OpenRead($tool.Url)
-    $total = $response.Length
-    $buffer = New-Object byte[] 8192
-    $read = 0
-    $fileStream = [System.IO.File]::OpenWrite($OutFile)
-
-    while (($count = $response.Read($buffer,0,$buffer.Length)) -gt 0) {
-        $fileStream.Write($buffer,0,$count)
-        $read += $count
-        $percent = [int](($read / $total) * 100)
-        Write-Progress -Activity "Downloading $($tool.Model)" -Status "$percent% complete" -PercentComplete $percent
-    }
-
-    $fileStream.Close()
-    $response.Close()
-    Write-Host "`nDownload complete!" -ForegroundColor Green
+    Invoke-WebRequest -Uri $tool.Url -OutFile $OutFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
+    Write-Host "Download complete!" -ForegroundColor Green
 } catch {
     Write-Host "Download failed! Check your internet connection or URL." -ForegroundColor Red
     exit
@@ -71,7 +50,7 @@ try {
 Write-Host "Extracting ZIP..."
 try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
     Write-Host "Extraction complete!" -ForegroundColor Green
 } catch {
     Write-Host "Error extracting ZIP!" -ForegroundColor Red
@@ -79,7 +58,7 @@ try {
 }
 
 # ----------------------
-# Launch EXE
+# Launch executable
 # ----------------------
 $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
 if ($exe) {
