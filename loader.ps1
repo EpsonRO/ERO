@@ -122,56 +122,49 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# BACKGROUND DOWNLOAD FUNCTION
+# ASYNC DOWNLOAD USING RUNSPACE
 # =========================
 function Download-Run($tool) {
     $buttonDownload.Enabled = $false
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
 
-    $bgWorker = New-Object System.ComponentModel.BackgroundWorker
-    $bgWorker.WorkerReportsProgress = $true
+    $scriptBlock = {
+        param($tool,$progressBar,$statusLabel)
 
-    $bgWorker.DoWork += {
-        param($sender, $e)
-
-        $OutFile = Join-Path $OutDir $tool.File
+        $OutFile = Join-Path $env:TEMP "ERO-Tools" $tool.File
         if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
 
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
 
         $wc.DownloadProgressChanged.Add({
-            param($s,$ev)
-            $sender.ReportProgress($ev.ProgressPercentage)
+            param($sender,$e)
+            $progressBar.Invoke([Action]{ $progressBar.Value = $e.ProgressPercentage; $statusLabel.Text="Downloading... $($e.ProgressPercentage)%" })
         })
 
         $wc.DownloadFile($tool.Url, $OutFile)
 
-        $ExtractDir = Join-Path $OutDir $tool.Model
+        $ExtractDir = Join-Path $env:TEMP "ERO-Tools" $tool.Model
         if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
         New-Item -ItemType Directory -Path $ExtractDir | Out-Null
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        $e.Result = $exe
+        if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" }) }
+        else { $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." }) }
+
+        $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
     }
 
-    $bgWorker.ProgressChanged += {
-        param($s,$ev)
-        $progressBar.Value = $ev.ProgressPercentage
-        $statusLabel.Text = "Downloading... $($ev.ProgressPercentage)%"
-    }
-
-    $bgWorker.RunWorkerCompleted += {
-        param($s,$e)
-        $progressBar.Value = 100
-        if ($e.Result) { Start-Process $e.Result.FullName; $statusLabel.Text = "Done!" }
-        else { $statusLabel.Text = "Executable not found." }
-        $buttonDownload.Enabled = $true
-    }
-
-    $bgWorker.RunWorkerAsync()
+    $runspace = [runspacefactory]::CreateRunspace()
+    $runspace.ApartmentState = "STA"
+    $runspace.ThreadOptions = "ReuseThread"
+    $runspace.Open()
+    $ps = [powershell]::Create()
+    $ps.Runspace = $runspace
+    $ps.AddScript($scriptBlock).AddArgument($tool).AddArgument($progressBar).AddArgument($statusLabel)
+    $ps.BeginInvoke()
 }
 
 $buttonDownload.Add_Click({
