@@ -122,7 +122,7 @@ $modelList.Add_SelectedIndexChanged({
 })
 
 # =========================
-# DOWNLOAD FUNCTION FOR PS7+
+# DOWNLOAD FUNCTION
 # =========================
 function Download-Tool {
     param($tool)
@@ -137,40 +137,41 @@ function Download-Tool {
     if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-    # Start async download with progress
-    Start-Job -Name "DownloadTool" -ScriptBlock {
-        param($tool,$OutFile)
+    $wc = New-Object System.Net.WebClient
 
-        $wc = [System.Net.Http.HttpClient]::new()
-        $response = $wc.GetAsync($tool.Url,[System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-        $total = $response.Content.Headers.ContentLength
-        $stream = $response.Content.ReadAsStreamAsync().Result
+    # Progress
+    $wc.DownloadProgressChanged.Add({
+        param($sender, $e)
+        $progressBar.Value = $e.ProgressPercentage
+        $statusLabel.Text = "Downloading... $($e.ProgressPercentage)%"
+    })
 
-        $fileStream = [System.IO.File]::OpenWrite($OutFile)
-        $buffer = New-Object byte[] 8192
-        $read = 0
-        while (($count = $stream.Read($buffer,0,$buffer.Length)) -gt 0) {
-            $fileStream.Write($buffer,0,$count)
-            $read += $count
-            $percent = [int](($read / $total) * 100)
-            $percent = [Math]::Min($percent,100)
-            # Send progress to main thread
-            Write-Output $percent
+    # Completed
+    $wc.DownloadFileCompleted.Add({
+        param($sender, $e)
+        if ($e.Error) {
+            $statusLabel.Text = "Download failed: $($e.Error.Message)"
+        } else {
+            $statusLabel.Text = "Extracting..."
+            try {
+                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+                if ($exe) { 
+                    Start-Process $exe.FullName
+                    $statusLabel.Text = "Done!"
+                } else {
+                    $statusLabel.Text = "Executable not found."
+                }
+            } catch {
+                $statusLabel.Text = "Extraction failed: $($_.Exception.Message)"
+            }
         }
-        $fileStream.Close()
-    } | ForEach-Object {
-        while (-not $_.HasMoreData) { Start-Sleep 0.1 }
-    } | Receive-Job -Keep
+        $progressBar.Value = 100
+        $buttonDownload.Enabled = $true
+    })
 
-    # Extract ZIP
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-
-    # Launch executable
-    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text = "Done!" }
-    else { $statusLabel.Text = "Executable not found." }
-    $progressBar.Value = 100
-    $buttonDownload.Enabled = $true
+    # Start download
+    $wc.DownloadFileAsync([Uri]$tool.Url, $OutFile)
 }
 
 $buttonDownload.Add_Click({
