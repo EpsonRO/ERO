@@ -2,7 +2,9 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+# =========================
 # SERIES & MODELS DATA
+# =========================
 $seriesModels = @{
     "L-Series" = @("L6190","L3150")
 }
@@ -16,10 +18,12 @@ $OutDir = Join-Path $env:TEMP "ERO-Tools"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
+# =========================
 # GUI SETUP
+# =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(580,540)
+$form.Size = New-Object System.Drawing.Size(580,520)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $form.FormBorderStyle = "FixedSingle"
@@ -35,7 +39,7 @@ $form.Controls.Add($title)
 $seriesCombo = New-Object System.Windows.Forms.ComboBox
 $seriesCombo.DropDownStyle = 'DropDownList'
 $seriesCombo.Items.AddRange($seriesModels.Keys)
-$seriesCombo.Location = New-Object System.Drawing.Point(30,60)
+$seriesCombo.Location = New-Object System.Drawing.Point(30,80)
 $seriesCombo.Size = New-Object System.Drawing.Size(220,30)
 $seriesCombo.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $seriesCombo.ForeColor = [System.Drawing.Color]::White
@@ -44,7 +48,7 @@ $form.Controls.Add($seriesCombo)
 $searchBox = New-Object System.Windows.Forms.TextBox
 $searchBox.Text = "Search model..."
 $searchBox.ForeColor = [System.Drawing.Color]::Gray
-$searchBox.Location = New-Object System.Drawing.Point(270,60)
+$searchBox.Location = New-Object System.Drawing.Point(270,80)
 $searchBox.Size = New-Object System.Drawing.Size(250,30)
 $searchBox.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $form.Controls.Add($searchBox)
@@ -52,8 +56,8 @@ $searchBox.Add_GotFocus({ if ($searchBox.Text -eq "Search model...") { $searchBo
 $searchBox.Add_LostFocus({ if ([string]::IsNullOrWhiteSpace($searchBox.Text)) { $searchBox.Text="Search model..."; $searchBox.ForeColor=[System.Drawing.Color]::Gray } })
 
 $modelList = New-Object System.Windows.Forms.ListBox
-$modelList.Location = New-Object System.Drawing.Point(30,100)
-$modelList.Size = New-Object System.Drawing.Size(490,180)
+$modelList.Location = New-Object System.Drawing.Point(30,120)
+$modelList.Size = New-Object System.Drawing.Size(490,200)
 $modelList.BackColor = [System.Drawing.Color]::FromArgb(45,45,48)
 $modelList.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($modelList)
@@ -61,29 +65,19 @@ $form.Controls.Add($modelList)
 $detailLabel = New-Object System.Windows.Forms.Label
 $detailLabel.Text = "Model: (none selected)"
 $detailLabel.ForeColor = [System.Drawing.Color]::White
-$detailLabel.Location = New-Object System.Drawing.Point(30,290)
+$detailLabel.Location = New-Object System.Drawing.Point(30,330)
 $detailLabel.Size = New-Object System.Drawing.Size(450,30)
 $form.Controls.Add($detailLabel)
 
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
-$buttonDownload.Location = New-Object System.Drawing.Point(30,330)
+$buttonDownload.Location = New-Object System.Drawing.Point(30,370)
 $buttonDownload.Size = New-Object System.Drawing.Size(490,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204) # Blue
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
-
-$buttonCancel = New-Object System.Windows.Forms.Button
-$buttonCancel.Text = "CANCEL"
-$buttonCancel.Location = New-Object System.Drawing.Point(30,380)
-$buttonCancel.Size = New-Object System.Drawing.Size(490,30)
-$buttonCancel.BackColor = [System.Drawing.Color]::DarkRed
-$buttonCancel.ForeColor = [System.Drawing.Color]::White
-$buttonCancel.FlatStyle = "Flat"
-$buttonCancel.Enabled = $false
-$form.Controls.Add($buttonCancel)
 
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(30,420)
@@ -99,7 +93,9 @@ $statusLabel.ForeColor = [System.Drawing.Color]::Black
 $statusStrip.Items.Add($statusLabel)
 $form.Controls.Add($statusStrip)
 
+# =========================
 # GUI EVENTS
+# =========================
 $form.Add_Shown({
     $title.Left = ($form.ClientSize.Width - $title.Width)/2
     $title.Top = 20
@@ -125,61 +121,60 @@ $modelList.Add_SelectedIndexChanged({
     }
 })
 
-# DOWNLOAD FUNCTION USING Register-ObjectEvent
-$global:cancelDownload = $false
-function Download-Run($tool) {
+# =========================
+# DOWNLOAD FUNCTION
+# =========================
+function Download-Run {
+    param($tool)
+
     $buttonDownload.Enabled = $false
-    $buttonCancel.Enabled = $true
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
-    $global:cancelDownload = $false
 
-    $OutFile = Join-Path $OutDir $tool.File
-    $ExtractDir = Join-Path $OutDir $tool.Model
+    # Run in background
+    $job = Start-Job -ArgumentList $tool, $progressBar, $statusLabel -ScriptBlock {
+        param($tool, $progressBar, $statusLabel)
 
-    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+        $OutDir = Join-Path $env:TEMP "ERO-Tools"
+        $OutFile = Join-Path $OutDir $tool.File
 
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent","Mozilla/5.0")
+        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+        $ExtractDir = Join-Path $OutDir $tool.Model
+        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
-    Register-ObjectEvent $wc DownloadProgressChanged -SourceIdentifier DownloadProgress -Action {
-        $progressBar.Invoke([Action]{ $progressBar.Value = $EventArgs.ProgressPercentage
-            $statusLabel.Text = "Downloading... $($EventArgs.ProgressPercentage)%"
-        })
-    } | Out-Null
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent","Mozilla/5.0")
 
-    Register-ObjectEvent $wc DownloadFileCompleted -SourceIdentifier DownloadComplete -Action {
-        if ($global:cancelDownload) {
-            $statusLabel.Invoke([Action]{ $statusLabel.Text="Download cancelled." })
-            $progressBar.Invoke([Action]{ $progressBar.Value = 0 })
-            $buttonDownload.Invoke([Action]{ $buttonDownload.Enabled = $true })
-            $buttonCancel.Invoke([Action]{ $buttonCancel.Enabled = $false })
-            return
-        }
+        $wc.DownloadFile($tool.Url, $OutFile)
 
-        New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
         [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
         $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" }) }
-        else { $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." }) }
+        if ($exe) {
+            Start-Process $exe.FullName
+            $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" })
+        } else {
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." })
+        }
+    }
 
-        $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
-        $buttonDownload.Invoke([Action]{ $buttonDownload.Enabled = $true })
-        $buttonCancel.Invoke([Action]{ $buttonCancel.Enabled = $false })
-    } | Out-Null
-
-    $wc.DownloadFileAsync($tool.Url, $OutFile)
+    # Poll progress every 0.2s
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 200
+    $timer.Add_Tick({
+        if ($job.State -eq 'Completed' -or $job.State -eq 'Failed') {
+            $timer.Stop()
+            Remove-Job $job -Force
+            $buttonDownload.Enabled = $true
+        }
+    })
+    $timer.Start()
 }
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
     if ($tool) { Download-Run $tool }
-})
-
-$buttonCancel.Add_Click({
-    $global:cancelDownload = $true
 })
 
 $form.ShowDialog()
