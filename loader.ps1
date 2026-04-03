@@ -23,7 +23,7 @@ New-Item -ItemType Directory -Path $OutDir | Out-Null
 # =========================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "EPSON RESETTER ONLINE"
-$form.Size = New-Object System.Drawing.Size(580,520)
+$form.Size = New-Object System.Drawing.Size(580,550)
 $form.StartPosition = "CenterScreen"
 $form.BackColor = [System.Drawing.Color]::FromArgb(37,37,38)
 $form.FormBorderStyle = "FixedSingle"
@@ -81,7 +81,7 @@ $form.Controls.Add($detailLabel)
 $buttonDownload = New-Object System.Windows.Forms.Button
 $buttonDownload.Text = "LAUNCH"
 $buttonDownload.Location = New-Object System.Drawing.Point(30,370)
-$buttonDownload.Size = New-Object System.Drawing.Size(490,40)
+$buttonDownload.Size = New-Object System.Drawing.Size(235,40)
 $buttonDownload.BackColor = [System.Drawing.Color]::FromArgb(0,122,204)
 $buttonDownload.ForeColor = [System.Drawing.Color]::White
 $buttonDownload.FlatStyle = "Flat"
@@ -89,6 +89,18 @@ $buttonDownload.Font = New-Object System.Drawing.Font("Segoe UI Semibold",11)
 $buttonDownload.Cursor = [System.Windows.Forms.Cursors]::Hand
 $buttonDownload.Enabled = $false
 $form.Controls.Add($buttonDownload)
+
+$buttonCancel = New-Object System.Windows.Forms.Button
+$buttonCancel.Text = "CANCEL"
+$buttonCancel.Location = New-Object System.Drawing.Point(285,370)
+$buttonCancel.Size = New-Object System.Drawing.Size(235,40)
+$buttonCancel.BackColor = [System.Drawing.Color]::DarkRed
+$buttonCancel.ForeColor = [System.Drawing.Color]::White
+$buttonCancel.FlatStyle = "Flat"
+$buttonCancel.Font = New-Object System.Drawing.Font("Segoe UI Semibold",11)
+$buttonCancel.Cursor = [System.Windows.Forms.Cursors]::Hand
+$buttonCancel.Enabled = $false
+$form.Controls.Add($buttonCancel)
 
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(30,420)
@@ -123,6 +135,7 @@ $seriesCombo.Add_SelectedIndexChanged({
     if ($selectedSeries) { $seriesModels[$selectedSeries] | ForEach-Object { $modelList.Items.Add($_) } }
     $detailLabel.Text = "Model: (none selected)"
     $buttonDownload.Enabled = $false
+    $buttonCancel.Enabled = $false
 })
 
 $modelList.Add_SelectedIndexChanged({
@@ -131,62 +144,68 @@ $modelList.Add_SelectedIndexChanged({
         $detailLabel.Text = "Model: $selModel"
         $foundTool = $tools | Where-Object { $_.Model -eq $selModel }
         $buttonDownload.Enabled = $foundTool -ne $null
+        $buttonCancel.Enabled = $false
         if ($foundTool) { $statusLabel.Text = "RESETTER AVAILABLE!" } else { $statusLabel.Text = "RESETTER NOT AVAILABLE YET!" }
     }
 })
 
 # =========================
-# ASYNC DOWNLOAD FUNCTION (RUNSPACE)
+# ASYNC DOWNLOAD FUNCTION WITH CANCEL
 # =========================
+$global:wc = $null
+
 function Download-Run($tool) {
     $buttonDownload.Enabled = $false
+    $buttonCancel.Enabled = $true
     $progressBar.Value = 0
     $statusLabel.Text = "Downloading..."
+    $global:wc = New-Object System.Net.WebClient
+    $global:wc.Headers.Add("User-Agent","Mozilla/5.0")
 
-    $scriptBlock = {
-        param($tool,$progressBar,$statusLabel)
-
-        $OutFile = Join-Path $env:TEMP "ERO-Tools" $tool.File
-        if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
-
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent","Mozilla/5.0")
-
-        $wc.DownloadProgressChanged.Add({
-            param($sender,$e)
-            $progressBar.Invoke([Action]{ 
-                $progressBar.Value = $e.ProgressPercentage
-                $statusLabel.Text="Downloading... $($e.ProgressPercentage)%"
-            })
+    $global:wc.DownloadProgressChanged.Add({
+        param($sender,$e)
+        $progressBar.Invoke([Action]{ 
+            $progressBar.Value = $e.ProgressPercentage
+            $statusLabel.Text="Downloading... $($e.ProgressPercentage)%"
         })
+    })
 
-        $wc.DownloadFile($tool.Url, $OutFile)
+    $global:wc.DownloadFileCompleted.Add({
+        param($sender,$e)
+        if ($e.Cancelled) {
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Download Cancelled" })
+        } elseif ($e.Error) {
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Error downloading file" })
+        } else {
+            $statusLabel.Invoke([Action]{ $statusLabel.Text = "Extracting..." })
 
-        $ExtractDir = Join-Path $env:TEMP "ERO-Tools" $tool.Model
-        if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-        New-Item -ItemType Directory -Path $ExtractDir | Out-Null
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
+            $OutFile = Join-Path $env:TEMP "ERO-Tools" $tool.File
+            $ExtractDir = Join-Path $env:TEMP "ERO-Tools" $tool.Model
+            if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+            New-Item -ItemType Directory -Path $ExtractDir | Out-Null
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile, $ExtractDir)
 
-        $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-        if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" }) }
-        else { $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." }) }
+            $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+            if ($exe) { Start-Process $exe.FullName; $statusLabel.Invoke([Action]{ $statusLabel.Text = "Done!" }) }
+            else { $statusLabel.Invoke([Action]{ $statusLabel.Text = "Executable not found." }) }
+            $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
+        }
+        $buttonDownload.Invoke([Action]{ $buttonDownload.Enabled = $true })
+        $buttonCancel.Invoke([Action]{ $buttonCancel.Enabled = $false })
+    })
 
-        $progressBar.Invoke([Action]{ $progressBar.Value = 100 })
-    }
-
-    $runspace = [runspacefactory]::CreateRunspace()
-    $runspace.ApartmentState = "STA"
-    $runspace.ThreadOptions = "ReuseThread"
-    $runspace.Open()
-    $ps = [powershell]::Create()
-    $ps.Runspace = $runspace
-    $ps.AddScript($scriptBlock).AddArgument($tool).AddArgument($progressBar).AddArgument($statusLabel)
-    $ps.BeginInvoke()
+    $OutFile = Join-Path $env:TEMP "ERO-Tools" $tool.File
+    if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
+    $global:wc.DownloadFileAsync($tool.Url, $OutFile)
 }
 
 $buttonDownload.Add_Click({
     $tool = $tools | Where-Object { $_.Model -eq $modelList.SelectedItem }
     if ($tool) { Download-Run $tool }
+})
+
+$buttonCancel.Add_Click({
+    if ($global:wc) { $global:wc.CancelAsync() }
 })
 
 $form.ShowDialog()
