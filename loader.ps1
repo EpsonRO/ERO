@@ -13,8 +13,8 @@ $seriesModels = @{
 }
 
 $tools = @(
-    @{Model="L6190"; Url="https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
-    @{Model="L3150"; Url="https://github.com/EpsonRO/L6190/releases/download/L3150/L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
+    @{Model="L6190"; Url="YOUR_DIRECT_LINK_L6190.zip"; File="L6190.zip"; Exe="AdjProg.exe"},
+    @{Model="L3150"; Url="YOUR_DIRECT_LINK_L3150.zip"; File="L3150.zip"; Exe="AdjProg.exe"}
 )
 
 $OutDir = Join-Path $env:TEMP "ERO-Tools"
@@ -146,31 +146,40 @@ $buttonDownload.Add_Click({
         $progressBar.Value = 0
         $statusLabel.Text = "Downloading..."
 
-        $job = Start-Job -ScriptBlock {
-            param($Url,$OutFile)
-            $wc = New-Object System.Net.WebClient
-            $wc.DownloadFile($Url, $OutFile)
-        } -ArgumentList $tool.Url, (Join-Path $OutDir $tool.File)
+        # Download in separate thread to prevent GUI freeze
+        $thread = [System.Threading.Thread]{
+            param($tool,$OutDir,$progressBar,$statusLabel)
+            $OutFile = Join-Path $OutDir $tool.File
+            $ExtractDir = Join-Path $OutDir $tool.Model
 
-        # Poll job and update progress (rough)
-        while (-not (Receive-Job $job -Keep -ErrorAction SilentlyContinue)) {
-            Start-Sleep -Milliseconds 200
-            $form.Refresh()
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent","Mozilla/5.0")
+
+            $wc.DownloadProgressChanged += {
+                $progressBar.Value = $_.ProgressPercentage
+                $statusLabel.Text = "Downloading... $($_.ProgressPercentage)%"
+            }
+
+            $wc.DownloadFileCompleted += {
+                $statusLabel.Text = "Download complete!"
+            }
+
+            $wc.DownloadFile($tool.Url, $OutFile)
+
+            # Extract ZIP
+            if (Test-Path $OutFile) {
+                try {
+                    if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
+                    [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
+                    $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
+                    if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
+                    else { $statusLabel.Text="Executable not found." }
+                } catch { $statusLabel.Text="Error extracting ZIP." }
+            } else { $statusLabel.Text="Download failed." }
         }
 
-        # Extract ZIP
-        $OutFile = Join-Path $OutDir $tool.File
-        $ExtractDir = Join-Path $OutDir $tool.Model
-        if (Test-Path $OutFile) {
-            try {
-                if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($OutFile,$ExtractDir)
-                $exe = Get-ChildItem -Path $ExtractDir -Recurse | Where-Object { $_.Name -ieq $tool.Exe } | Select-Object -First 1
-                if ($exe) { Start-Process $exe.FullName; $statusLabel.Text="Done! Launched." }
-                else { $statusLabel.Text="Executable not found." }
-            } catch { $statusLabel.Text="Error extracting ZIP." }
-        } else { $statusLabel.Text="Download failed." }
-
+        $thread.Start($tool,$OutDir,$progressBar,$statusLabel)
+        $thread.Join()
         $buttonDownload.Enabled = $true
     }
 })
