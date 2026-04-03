@@ -1,45 +1,54 @@
 # =========================
-# Epson Resetter Console Downloader
+# Epson Resetter Console Downloader (Smart Version)
 # =========================
 
 # Output directory
 $OutDir = "$env:TEMP\Epson-Resetter"
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out-Null }
 
-# Available tools (model -> direct download link)
-$tools = @{
+# Define all known models (some may have links, some not)
+$allModels = @{
     "L6190" = "https://github.com/EpsonRO/L6190/releases/download/L6190/L6190.zip"
     "L3150" = "https://www.dropbox.com/scl/fi/yuscc3h8xmfetwb08wnfn/L3150.zip?dl=1"
+    "L8050" = $null   # Example of a model known but no resetter yet
+    "L4550" = $null
 }
 
-# Prompt user for model
+# Prompt user
 $model = Read-Host "Enter your printer model (e.g., L6190, L3150)"
 
-# Check if link exists
-if (-not $tools.ContainsKey($model)) {
-    Write-Host "Resetter not found for $model" -ForegroundColor Red
+# Logic check
+if (-not $allModels.ContainsKey($model)) {
+    Write-Host "`nNot a valid model." -ForegroundColor Red
     exit
 }
 
-$url = $tools[$model]
+# Model exists
+$link = $allModels[$model]
+if ([string]::IsNullOrEmpty($link)) {
+    Write-Host "`nResetter not added yet for $model." -ForegroundColor Yellow
+    exit
+}
+
+# Download and run
 $zipFile = Join-Path $OutDir "$model.zip"
 $extractDir = Join-Path $OutDir $model
 
-# Remove old files
+# Clean previous files
 if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
 if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
 
 # Download
-Write-Host "Downloading resetter for $model..." -ForegroundColor Cyan
+Write-Host "`nDownloading resetter for $model..." -ForegroundColor Cyan
 try {
-    Invoke-WebRequest -Uri $url -OutFile $zipFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
+    Invoke-WebRequest -Uri $link -OutFile $zipFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
     Write-Host "Download complete!" -ForegroundColor Green
 } catch {
     Write-Host "Download failed! Check your internet connection or URL." -ForegroundColor Red
     exit
 }
 
-# Extract ZIP
+# Extract
 Write-Host "Extracting..." -ForegroundColor Cyan
 try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -50,7 +59,7 @@ try {
     exit
 }
 
-# Run executable
+# Launch executable
 $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "AdjProg.exe" | Select-Object -First 1
 if ($exe) {
     Write-Host "Launching AdjProg.exe..." -ForegroundColor Cyan
