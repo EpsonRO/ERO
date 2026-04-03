@@ -1,3 +1,7 @@
+# =========================
+# EPSON RESETTER GUI (Universal)
+# =========================
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -106,7 +110,7 @@ $buttonDownload.Add_Click({
     if (Test-Path $ExtractDir) { Remove-Item $ExtractDir -Recurse -Force }
 
     try {
-        # Download synchronously (works on all PS versions)
+        # Download synchronously
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent","Mozilla/5.0")
         $wc.DownloadFile($tool.Url, $OutFile)
@@ -114,6 +118,7 @@ $buttonDownload.Add_Click({
     } catch {
         $statusLabel.Text = "Download failed!"
         $buttonDownload.Enabled = $true
+        $progressBar.MarqueeAnimationSpeed = 0
         return
     }
 
