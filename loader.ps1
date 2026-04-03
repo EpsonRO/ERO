@@ -30,10 +30,7 @@ function Show-Banner {
 |  __| |  _ <| |  | |
 | |____| |_) | |__| |
 |______|____/ \____/ 
-+++++++++++++++++++++
-EPSON RESETTER ONLINE
-+++++++++++++++++++++
-
+      ERO Resetters
 "@ -ForegroundColor Cyan
 }
 
@@ -43,7 +40,7 @@ function Run-Resetter {
 
     $link = $allModels[$series][$model]
     if ([string]::IsNullOrEmpty($link)) {
-        Write-Host "`nResetter not added yet for $model." -ForegroundColor Yellow
+        Write-Host "`nResetter not added yet for ${model}." -ForegroundColor Yellow
         Start-Sleep 2
         return
     }
@@ -54,7 +51,7 @@ function Run-Resetter {
     if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
     if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
 
-    Write-Host "`nDownloading resetter for $model..." -ForegroundColor Cyan
+    Write-Host "`nDownloading resetter for ${model}..." -ForegroundColor Cyan
     try {
         Invoke-WebRequest -Uri $link -OutFile $zipFile -UseBasicParsing -Headers @{ "User-Agent" = "Mozilla/5.0" }
         Write-Host "Download complete!" -ForegroundColor Green
@@ -83,14 +80,15 @@ function Run-Resetter {
         }
     }
 
-    $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "AdjProg.exe" | Select-Object -First 1
+    # Auto-find first EXE inside extracted folder
+    $exe = Get-ChildItem -Path $extractDir -Recurse -Filter "*.exe" | Select-Object -First 1
     if ($exe) {
-        Write-Host "Launching AdjProg.exe..." -ForegroundColor Cyan
+        Write-Host "Launching ${exe.Name} for ${model}..." -ForegroundColor Cyan
         Start-Process $exe.FullName -Wait
-        Write-Host "`nAdjProg.exe closed. Returning to menu..." -ForegroundColor Green
+        Write-Host "`n${exe.Name} closed. Returning to menu..." -ForegroundColor Green
         Start-Sleep 2
     } else {
-        Write-Host "AdjProg.exe not found in extracted files." -ForegroundColor Red
+        Write-Host "No executable found in extracted files." -ForegroundColor Red
         Start-Sleep 2
     }
 }
@@ -120,7 +118,7 @@ while ($true) {
 
     $selectedSeries = $seriesList[$choice - 1]
     $models = $allModels[$selectedSeries].Keys
-    Write-Host "`nAvailable models in $selectedSeries:" -ForegroundColor White
+    Write-Host "`nAvailable models in ${selectedSeries}:" -ForegroundColor White
     $models | ForEach-Object { Write-Host "- $_" }
 
     $model = Read-Host "`nEnter your model"
